@@ -1,0 +1,1 @@
+../../../ai-write-ink/skills/puppet-ink/agents/agent-puppet-ink.md

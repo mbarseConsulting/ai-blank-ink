@@ -1,0 +1,1 @@
+../../../ai-write-ink/output-styles/ink.md

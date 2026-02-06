@@ -1,0 +1,1 @@
+../../../ai-forge-ink/skills/world-ink/agents/agent-world-ink.md

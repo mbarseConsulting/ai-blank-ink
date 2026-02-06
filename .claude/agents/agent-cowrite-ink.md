@@ -1,0 +1,1 @@
+../../../ai-write-ink/skills/cowrite-ink/agents/agent-cowrite-ink.md
