@@ -1,0 +1,1 @@
+../../../ai-write-ink/skills/qa-prose/agents/agent-qa-prose.md

@@ -1,0 +1,1 @@
+../../../ai-write-ink/skills/write-ink/agents/agent-write-ink.md

@@ -1,0 +1,1 @@
+../../../ai-write-ink/skills/qa-consistency/agents/agent-qa-consistency.md
