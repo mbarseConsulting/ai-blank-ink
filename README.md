@@ -51,3 +51,176 @@ AI Blank Ink is a unified creative studio that brings together fiction writing, 
 | `steps`     | Precision modifier — chunks long content into ~500-word blocks for granular analysis            |
 
 **23 skills** — 14 writing, 3 visual, 6 utilities
+
+## Usage
+
+### Writing & Fiction
+
+#### `/calibrate-ink`
+
+Set genre conventions for the session. Call at session start or after context loss.
+
+---
+
+#### `/cowrite-ink`
+
+Discuss fiction — critique, direction, alternatives, beats. Brainstorm or unblock.
+
+- **`-w` / `--write`** — handoff to prose: outputs context for ink, then stops
+- **default** — creative interlocutor, adapts to what you bring
+
+---
+
+#### `/outline-ink`
+
+Build story structure from macro to micro.
+
+- **`--universe-sagas`** / **`--saga`** / **`--arc`** / **`--chapter`** / **`--script`** — loads matching template, builds section by section
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — structural interrogation: what level, what exists, what needs building
+
+---
+
+#### `/arch-ink`
+
+Challenge story structure before writing. Diagnose acts, arcs, throughlines.
+
+- **`-r` / `--report`** — full structural diagnostic with rules loaded
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — interrogation: one question at a time on the weakest structural element
+
+---
+
+#### `/write-ink`
+
+Write narrative prose — scenes, chapters, continuations, surgical rewrites.
+
+- **`--check`** — strict context verification before writing
+- **`-i` / `--inline`** — write prose inline instead of file
+- **default** — writes in the fiction's register, output to file
+
+---
+
+#### `/dialog-ink`
+
+Stage dialogue scenes with physical movement and spoken language.
+
+- **`-p` / `--pass`** — annotated diagnostic of existing prose
+- **`--check`** — context verification, combines with any mode
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — scene mode, semi-theatrical script output to file
+
+---
+
+#### `/puppet-ink`
+
+Collaborative fiction with characters.
+
+- **`-p` / `--puppet`** — character embodiment in first person ("parle-moi en tant que...")
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — roleplay, NPC performance, world simulation
+
+---
+
+#### `/qa-reader`
+
+Evaluate reading experience — hooks, pacing, tension, engagement.
+
+- **`-r` / `--report`** — full report with rules loaded
+- **`-b` / `--bookends`** — focused on opening/closing analysis
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — emoji-block diagnostic (gut → editor → critic)
+
+---
+
+#### `/qa-prose`
+
+Evaluate sentence-level craft — POV, show-tell, dialogue, description.
+
+- **`-r` / `--report`** — full report with rules loaded
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — emoji-block diagnostic
+
+---
+
+#### `/qa-characters`
+
+Evaluate character psychology, arcs, dynamics, credibility.
+
+- **`-r` / `--report`** — full report with rules loaded
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — emoji-block diagnostic per character
+
+---
+
+#### `/qa-consistency`
+
+Verify continuity — objects, timeline, lore, arcs, OOC behavior.
+
+- **`-r` / `--report`** — full report with rules loaded
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — dual-cite findings (establishment + violation)
+
+---
+
+#### `/qa-originality`
+
+Evaluate creative singularity — voice, concept, freshness, clichés.
+
+- **`-r` / `--report`** — full report with rules loaded
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — emoji-block diagnostic
+
+---
+
+#### `/edit-ai-fr`
+
+Clean French fiction prose of AI patterns, language errors, mechanical repetition.
+
+- **`--interactive`** — one correction at a time, wait for confirmation
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — batch mode: list all findings, then apply on command
+
+---
+
+#### `/edit-final`
+
+Last pass before publication — typos, grammar, typography, mechanical consistency.
+
+- **`--interactive`** — one correction at a time, wait for confirmation
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — batch mode: list all findings, then apply on command
+
+---
+
+### Visual Fiction
+
+#### `/world-ink`
+
+Build or extend a world bible — universe, timeline, characters, relations.
+
+- **`--universe` / `--timeline` / `--character` / `--relation`** — guided construction by template
+- **`-i` / `--inline`** — write output inline instead of file
+- **default** — interrogation: identify gaps, propose structure
+
+---
+
+#### `/scan-ink`
+
+Analyze comic/manga/BD scans — extract script, scenes, tags, characters.
+
+- **`--script`** — dialogue + stage directions only
+- **`--scene`** — scene description only
+- **`--tags`** — categorized tags only
+- **`--characters`** — character identification and description
+- **default** — full analysis: dialogue + scene + summary
+
+---
+
+#### `/prompt-ink`
+
+Generate image prompts from narrative content.
+
+- **`--novelai`** — NovelAI syntax (default)
+- **`--midjourney`** — Midjourney syntax
+- **`--sd`** — Stable Diffusion syntax
