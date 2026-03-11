@@ -1,0 +1,165 @@
+/* Réutilise les styles de l’éditeur principal */
+@import './app.component.css';
+
+/* Shell interne pour éviter les conflits avec .editor-area du layout global */
+.editor-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;   /* prend toute la hauteur donnée par .editor-area */
+  width: 100%;    /* prend toute la largeur disponible dans la colonne centrale */
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #111827;
+  background: #020617;
+}
+
+.toolbar-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.toolbar-field select {
+  background: #020617;
+  border-radius: 4px;
+  border: 1px solid #1f2937;
+  color: #e5e7eb;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.toolbar-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Hôte CodeMirror pour occuper tout l'espace disponible */
+.cm-editor-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.cm-editor {
+  height: 100%;
+  width: 100%;
+}
+
+/* Font families (via ::ng-deep pour atteindre le DOM interne CodeMirror) */
+:host ::ng-deep .cm-editor-host.font-georgia .cm-content {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-times .cm-content {
+  font-family: 'Times New Roman', Times, serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-garamond .cm-content {
+  font-family: 'Garamond', 'Times New Roman', serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-palatino .cm-content {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-arial .cm-content {
+  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-helvetica .cm-content {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-inter .cm-content {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-roboto .cm-content {
+  font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+}
+
+:host ::ng-deep .cm-editor-host.font-jetbrains .cm-content {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+:host ::ng-deep .cm-editor-host.font-consolas .cm-content {
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+/* Font sizes */
+:host ::ng-deep .cm-editor-host.size-small .cm-content {
+  font-size: 13px;
+}
+
+:host ::ng-deep .cm-editor-host.size-medium .cm-content {
+  font-size: 15px;
+}
+
+:host ::ng-deep .cm-editor-host.size-large .cm-content {
+  font-size: 17px;
+}
+
+.inline-suggestions {
+  padding: 4px 16px 0;
+}
+
+.inline-suggestion-card {
+  margin: 6px 0;
+}
+
+.inline-suggestion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.inline-suggestion-axis {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.inline-suggestion-note {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.inline-suggestion-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.inline-suggestion-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inline-line {
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.inline-line--before {
+  background: rgba(248, 171, 63, 0.16); /* orange-ish, like current text highlight */
+}
+
+.inline-line--after {
+  background: rgba(34, 197, 94, 0.18); /* green-ish, improved suggestion */
+}

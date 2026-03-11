@@ -1,0 +1,66 @@
+<main class="editor-shell">
+  <header class="editor-toolbar">
+    <label class="toolbar-field">
+      <span class="toolbar-label">Font</span>
+      <select [(ngModel)]="fontId">
+        <option *ngFor="let f of fontOptions" [value]="f.id">
+          {{ f.label }}
+        </option>
+      </select>
+    </label>
+
+    <label class="toolbar-field">
+      <span class="toolbar-label">Size</span>
+      <select [(ngModel)]="fontSize">
+        <option *ngFor="let s of sizeOptions" [value]="s.id">
+          {{ s.label }}
+        </option>
+      </select>
+    </label>
+  </header>
+
+  <section class="editor-pane">
+    <div
+      #editorHost
+      class="cm-editor-host"
+      [ngClass]="['font-' + fontId, 'size-' + fontSize]"
+    ></div>
+  </section>
+
+  <!-- Inline suggestions, GitLab-style, under the main text -->
+  <section class="inline-suggestions" *ngIf="patches.length">
+    <div *ngFor="let patch of patches" class="inline-suggestion-card">
+      <div class="inline-suggestion-header">
+        <span class="inline-suggestion-axis">{{ patch.axis }}</span>
+        <div class="inline-suggestion-actions">
+          <button class="btn-ghost" (click)="onRejectPatchClick(patch)">
+            Cancel
+          </button>
+          <button class="btn-accept" (click)="onAcceptPatchClick(patch)">
+            Apply suggestion
+          </button>
+        </div>
+      </div>
+      <div class="inline-suggestion-note" *ngIf="patch.note">
+        {{ patch.note }}
+      </div>
+      <div class="inline-suggestion-diff">
+        <pre class="inline-line inline-line--before">{{ patch.beforeText }}</pre>
+        <pre class="inline-line inline-line--after">{{ patch.afterText }}</pre>
+      </div>
+    </div>
+  </section>
+
+  <footer class="prompt-bar">
+    <input
+      type="text"
+      class="prompt-input"
+      placeholder="Parler à l’atelier (ex : 'diagnostique l’ouverture', 'propose un titre')"
+      [ngModel]="promptText"
+      (ngModelChange)="onPromptChange($event)"
+      (keyup.enter)="onSendPrompt()"
+    />
+    <button class="prompt-send" (click)="onSendPrompt()">Envoyer</button>
+  </footer>
+</main>
+

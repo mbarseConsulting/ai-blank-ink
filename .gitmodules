@@ -1,0 +1,9 @@
+[submodule "deps/ai-forge-ink"]
+	path = deps/ai-forge-ink
+	url = ../ai-forge-ink
+[submodule "deps/ai-write-ink"]
+	path = deps/ai-write-ink
+	url = ../ai-write-ink
+[submodule "deps/ai-crafter-toolkit"]
+	path = deps/ai-crafter-toolkit
+	url = ../ai-crafter-toolkit

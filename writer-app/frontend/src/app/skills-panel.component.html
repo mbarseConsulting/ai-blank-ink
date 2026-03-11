@@ -1,0 +1,27 @@
+<section class="skills-panel">
+  <h2 class="sidebar-title">Skills</h2>
+  <ul class="skills-list">
+    <li
+      *ngFor="let skill of skills"
+      class="skill-item"
+      [class.skill--selected]="skill.name === selectedSkill"
+      (click)="onSelectSkill(skill.name)"
+    >
+      <div class="skill-item-header">
+        <div>
+          <div class="skill-label">{{ skill.label }}</div>
+          <div class="skill-desc">{{ skill.description }}</div>
+        </div>
+        <span class="skill-status-pill">Not run</span>
+      </div>
+    </li>
+  </ul>
+  <button
+    class="run-skill-btn"
+    [disabled]="!selectedSkill"
+    (click)="onRunSkill()"
+  >
+    Run selected skill
+  </button>
+</section>
+

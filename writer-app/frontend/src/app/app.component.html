@@ -1,0 +1,84 @@
+<div class="layout">
+  <!-- Colonne gauche : navigation documents (arbre mock) -->
+  <aside class="sidebar-left">
+    <h2 class="sidebar-title">Textes</h2>
+
+    <div class="save-row">
+      <button class="save-button" type="button" (click)="saveCurrentDocument()">
+        Enregistrer
+      </button>
+      <span class="save-indicator" *ngIf="saveIndicator">{{ saveIndicator }}</span>
+    </div>
+
+    <button
+      class="refresh-button"
+      type="button"
+      (click)="refreshStoriesTree()"
+      [disabled]="treeLoading"
+    >
+      {{ treeLoading ? '…' : 'Actualiser' }}
+    </button>
+
+    <ul class="tree-root">
+      <li *ngFor="let node of documentTree">
+        <ng-container
+          *ngTemplateOutlet="renderNode; context: { $implicit: node, level: 0 }"
+        ></ng-container>
+      </li>
+    </ul>
+
+    <div class="sidebar-hint" *ngIf="!documentTree.length">
+      Aucun projet dans stories/
+    </div>
+
+    <ng-template #renderNode let-node let-level="level">
+      <div
+        class="tree-node"
+        [class.tree-node--folder]="node.kind === 'folder'"
+        [class.tree-node--active]="node.id === currentDocumentSafe.id"
+        [style.paddingLeft.px]="level * 12"
+        (click)="onNodeClick(node, $event)"
+      >
+        <span class="tree-node-chevron" *ngIf="node.kind === 'folder'">
+          {{ isFolderExpanded(node) ? '▾' : '▸' }}
+        </span>
+        <span class="tree-node-label" [class.tree-node-label--with-chevron]="node.kind === 'folder'">{{ node.label }}</span>
+      </div>
+
+      <ul *ngIf="node.children?.length && node.kind === 'folder' && isFolderExpanded(node)">
+        <li *ngFor="let child of node.children">
+          <ng-container
+            *ngTemplateOutlet="renderNode; context: { $implicit: child, level: level + 1 }"
+          ></ng-container>
+        </li>
+      </ul>
+    </ng-template>
+  </aside>
+
+  <!-- Centre : éditeur + suggestions inline -->
+  <div class="editor-area">
+    <app-document-editor
+      *ngIf="currentDocument"
+      [document]="currentDocument"
+      [patches]="pendingPatches"
+      (acceptPatch)="acceptPatch($event)"
+      (rejectPatch)="rejectPatch($event)"
+      (documentContentChange)="currentDocument = { ...currentDocument, content: $event }"
+      [promptText]="promptText"
+      (promptTextChange)="promptText = $event"
+      (sendPromptRequested)="sendPrompt()"
+    ></app-document-editor>
+  </div>
+
+  <!-- Colonne droite : skills + propositions -->
+  <aside class="sidebar-right">
+    <app-skills-panel
+      [skills]="availableSkills"
+      [selectedSkill]="selectedSkillName"
+      (skillSelected)="selectSkill($event)"
+      (runSkillRequested)="runSelectedSkill()"
+    ></app-skills-panel>
+
+    <!-- Panneau de patches inutilisé pour l’instant (tout est inline dans l’éditeur) -->
+  </aside>
+</div>

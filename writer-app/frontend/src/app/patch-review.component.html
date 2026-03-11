@@ -1,0 +1,32 @@
+<div class="patch-review" *ngIf="patch">
+  <header class="patch-review-header">
+    <div>
+      <div class="patch-review-axis">{{ patch.axis }}</div>
+      <div class="patch-review-note" *ngIf="patch.note">{{ patch.note }}</div>
+    </div>
+    <div class="patch-review-actions">
+      <button class="btn-ghost" (click)="onClose()">Close</button>
+      <button class="btn-reject" (click)="onReject()">Reject</button>
+      <button class="btn-accept" (click)="onAccept()">Accept</button>
+    </div>
+  </header>
+
+  <section class="patch-review-context">
+    <p class="patch-review-context-text">
+      <!-- placeholder for future context snippet -->
+      Showing proposed change for current document (mock).
+    </p>
+  </section>
+
+  <section class="patch-review-diff">
+    <div class="diff-block diff-block--before">
+      <div class="diff-label">Before</div>
+      <pre>{{ patch.beforeText }}</pre>
+    </div>
+    <div class="diff-block diff-block--after">
+      <div class="diff-label">After (proposed)</div>
+      <pre>{{ patch.afterText }}</pre>
+    </div>
+  </section>
+</div>
+

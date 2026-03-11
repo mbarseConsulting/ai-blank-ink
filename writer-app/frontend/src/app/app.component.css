@@ -1,0 +1,353 @@
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr 320px; /* nav gauche + grosse zone centrale + panneau droit */
+  grid-template-rows: 100vh;              /* occupe tout l'écran */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+}
+
+.sidebar-left,
+.sidebar-right {
+  background: #0f172a;
+  color: #e5e7eb;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  margin: 0 0 4px;
+}
+
+.sidebar-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 8px;
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.refresh-button {
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.refresh-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.save-button {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.save-button:hover {
+  background: #1f2937;
+}
+
+.save-indicator {
+  font-size: 12px;
+  color: #6ee7b7;
+}
+
+/* Arbre de documents dans la colonne de gauche */
+.tree-root {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #e5e7eb;
+}
+
+.tree-node-chevron {
+  font-size: 10px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.tree-node-label--with-chevron {
+  min-width: 0;
+}
+
+.tree-node--folder {
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.tree-node:hover {
+  background: #111827;
+}
+
+.tree-node--active {
+  background: #111827;
+  border: 1px solid #4b5563;
+}
+
+.tree-node-label {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.doc-item {
+  padding: 8px;
+  border-radius: 6px;
+  background: #111827;
+  border: 1px solid #1f2937;
+}
+
+.doc-item--active {
+  border-color: #4b5563;
+}
+
+.doc-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.doc-status {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.editor-area {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* important pour que l'intérieur puisse scroller */
+  height: 100%;  /* prend toute la hauteur de la cellule centrale */
+  background: #020617;
+  color: #e5e7eb;
+  overflow-y: auto; /* permet de scroller quand le contenu dépasse */
+}
+
+/* Assure que l’éditeur interne occupe bien toute la hauteur disponible */
+app-document-editor {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+}
+
+.editor-pane {
+  flex: 1;
+  padding: 8px 16px 0;
+  min-height: 0;
+  display: flex;
+}
+
+.prompt-bar {
+  display: flex;
+  padding: 8px 12px;
+  border-top: 1px solid #111827;
+  gap: 8px;
+  background: #020617;
+}
+
+.prompt-input {
+  flex: 1;
+  border-radius: 6px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.prompt-send {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.skills-panel,
+.patches-panel {
+  padding: 4px 0;
+}
+
+.skills-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skill-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #1f2937;
+  background: #020617;
+  display: flex;
+  flex-direction: column;
+}
+
+.skill-item:hover {
+  background: #111827;
+}
+
+.skill--selected {
+  border-color: #4b5563;
+  background: #111827;
+}
+
+.skill-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.skill-desc {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.skill-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.skill-status-pill {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid #1f2937;
+  color: #9ca3af;
+}
+
+.run-skill-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: none;
+  background: #4b5563;
+  color: white;
+  cursor: pointer;
+}
+
+.run-skill-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.patch-card {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #020617;
+  border: 1px solid #1f2937;
+}
+
+.patch-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.patch-axis {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.patch-note {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.patch-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.patch-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.patch-before pre,
+.patch-after pre {
+  margin: 0;
+  padding: 4px;
+  background: #020617;
+  border-radius: 4px;
+  font-size: 11px;
+  max-height: 80px;
+  overflow: auto;
+}
+
+.patch-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.btn-accept,
+.btn-reject {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-accept {
+  background: #16a34a;
+  color: white;
+}
+
+.btn-reject {
+  background: #b91c1c;
+  color: white;
+}
+
