@@ -318,20 +318,100 @@ Cursor devient **une option de front-end**, pas un prérequis.
 
 ---
 
-## 9. Prochaines étapes d’implémentation
+## 9. État actuel de l’implémentation (Angular + Tauri)
 
-1. Définir précisément les schémas JSON pour :
-   - `Document`
-   - `SkillRun`
-   - `Patch`
-2. Choisir le backend (Node/Express ou FastAPI) et implémenter :
-   - `POST /skill-runs` (lance un skill)
-   - `GET /documents/:id`
-   - `PATCH /documents/:id/apply-patches`
-3. Mettre en place l’appel à l’API de modèle (Claude/Anthropic ou autre) en injectant les `SKILL.md` du repo.
-4. Prototyper le front (web) :
-   - Éditeur central
-   - Panneau de skills
-   - Vue diff des patchs
-5. Itérer sur le format de réponse des différents skills pour stabiliser `diagnostics` + `patches`.
+### 9.1. Shell desktop & fichiers
+
+- **Tauri 2** initialisé dans `writer-app/src-tauri/` avec :
+  - `open_document(path: String) -> String` – lecture d’un `.md` depuis le repo (ex. `stories/LaGalerie/scene-1.md`).
+  - `save_document(path: String, content: String) -> ()` – écriture directe sur le disque.
+  - `list_stories_tree() -> DocumentNode[]` – scan récursif de `stories/` et retour d’un arbre `[folder|document]` (chemins relatifs).
+
+- **Frontend Angular** dans `writer-app/frontend/` :
+  - Arbre à gauche alimenté par `list_stories_tree` (dossiers + fichiers `.md`).
+  - Clic sur un fichier → `open_document` → charge le texte dans `currentDocument`.
+  - Bouton `Enregistrer` + `Ctrl+S` → `save_document` sur le fichier courant, avec indicateur visuel de sauvegarde.
+
+### 9.2. Éditeur central (CodeMirror 6)
+
+- Remplacement du `<textarea>` par **CodeMirror 6** configuré pour la prose :
+  - `basicSetup` + `markdown()` + `lineWrapping`.
+  - Thème sombre « page de roman » (fonds, interligne, padding).
+  - Barre d’outils locale :
+    - Choix de **police** (Georgia, Times, Garamond, Inter, etc.).
+    - Choix de **taille** (Small / Medium / Large).
+
+- La zone centrale occupe tout l’espace disponible, avec scroll vertical propre, prompt fixé en bas.
+
+### 9.3. Patches inline (mock)
+
+- **Modèle `PatchModel`** déjà aligné avec le plan (offsets + `beforeText` / `afterText` + `axis` + `note`).
+- Intégration native dans CodeMirror :
+  - Chaque patch est rendu comme :
+    - Un `Decoration.mark` sur la plage ciblée (`cm-patch-before`) → fond rouge semi‑transparent (texte actuel).
+    - Un `Decoration.widget` juste après la plage → bloc vert (`cm-patch-suggestion`) avec :
+      - texte suggéré,
+      - boutons `Apply suggestion` / `Cancel`.
+  - Styles appliqués via `styles.css` (`.cm-patch-before`, `.cm-patch-suggestion`, etc.).
+
+- **Application des suggestions** :
+  - Le bouton **Apply** déclenche une transaction CodeMirror :
+    - `changes: { from: startOffset, to: endOffset, insert: afterText }`.
+  - L’éditeur émet ensuite `documentContentChange` vers Angular → `currentDocument.content` est synchronisé.
+  - Côté `App`, `acceptPatch` se contente de retirer le patch de `pendingPatches`.
+
+### 9.4. Mocks de skills
+
+- **QA lecture (`qa-reader`)** :
+  - `runSelectedSkill` appelle `createMockPatch('qa-reader')` côté éditeur.
+  - Détection exacte du bloc :
+    - `Elle tendit la main vers …` jusqu’à `— Permettez.` via regex sur `EditorState.doc`.
+    - Offsets validés via `doc.sliceString(from, to)` pour éviter les décalages.
+  - `afterText` = bloc identique + ` [TEST]` à la fin pour visualiser l’application.
+
+- **Originalité (`qa-originality`)** :
+  - `runSelectedSkill` détecte ce skill et appelle `createMockOriginalityPatches()` :
+    - Crée plusieurs `PatchModel` sur des phrases arbitraires (ex. : `Les rayonnages montaient haut…`, `Elle regarda autour d'elle…`).
+    - Chaque suggestion ajoute aussi ` [TEST]` en fin de bloc.
+  - Résultat : plusieurs suggestions simultanées, chacune avec son bloc rouge + bloc vert + boutons.
+
+- Changement de fichier dans le panneau gauche :
+  - `pendingPatches` est vidé → pas de suggestions résiduelles quand on change de texte.
+
+---
+
+## 10. Prochaines étapes d’implémentation
+
+1. **Passer du mock aux vrais skills**
+   - Créer des commandes Tauri :
+     - `run_skill(skillName: String, path: String, range: Option<Range>) -> SkillRunModel`.
+   - Lire les `SKILL.md` / `agent-*.md` depuis `deps/ai-write-ink`, `deps/ai-forge-ink`, etc.
+   - Construire les prompts, appeler l’API modèle et renvoyer de vrais `diagnostics[]` + `patches[]`.
+   - Côté Angular :
+     - Remplacer `createMockPatch` / `createMockOriginalityPatches` par les données renvoyées par Tauri.
+
+2. **Gestion avancée des patches**
+   - Grouper les suggestions par `SkillRun` + `axis` dans le panneau droit.
+   - Ajouter des actions batch :
+     - `Accepter toutes les propositions de cet axis`.
+     - `Rejeter toutes les propositions de ce SkillRun`.
+   - Journaliser les états (`history[]`) à chaque batch d’acceptation.
+
+3. **Diagnostics & gutter**
+   - Introduire un panneau `Diagnostics` branché sur `DiagnosticModel` (déjà défini dans `models.ts`).
+   - Mapper les diagnostics sur :
+     - surlignages légers (pas de widget),
+     - markers dans la gouttière (Gutter Insights).
+   - Clic sur un diagnostic → scroll + focus dans l’éditeur.
+
+4. **Persistance & multi-documents**
+   - Ajouter un mini-cache de `SkillRun` par document (mémoire ou fichier `.json` à côté du `.md`).
+   - Gérer les cas où le fichier a changé depuis le dernier run (invalidation des patches obsolètes).
+
+5. **Polish UX**
+   - Thème clair optionnel.
+   - Préférences (police/taille par défaut, largeur de colonne).
+   - Animation subtile sur apparition / disparition de suggestions.
+
+Ces étapes gardent l’architecture actuelle (Tauri + Angular + CodeMirror + patches inline), mais remplacent progressivement le mock par un flux complet skill → diagnostics → patches → accept/reject.
 

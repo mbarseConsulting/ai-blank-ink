@@ -27,30 +27,6 @@
     ></div>
   </section>
 
-  <!-- Inline suggestions, GitLab-style, under the main text -->
-  <section class="inline-suggestions" *ngIf="patches.length">
-    <div *ngFor="let patch of patches" class="inline-suggestion-card">
-      <div class="inline-suggestion-header">
-        <span class="inline-suggestion-axis">{{ patch.axis }}</span>
-        <div class="inline-suggestion-actions">
-          <button class="btn-ghost" (click)="onRejectPatchClick(patch)">
-            Cancel
-          </button>
-          <button class="btn-accept" (click)="onAcceptPatchClick(patch)">
-            Apply suggestion
-          </button>
-        </div>
-      </div>
-      <div class="inline-suggestion-note" *ngIf="patch.note">
-        {{ patch.note }}
-      </div>
-      <div class="inline-suggestion-diff">
-        <pre class="inline-line inline-line--before">{{ patch.beforeText }}</pre>
-        <pre class="inline-line inline-line--after">{{ patch.afterText }}</pre>
-      </div>
-    </div>
-  </section>
-
   <footer class="prompt-bar">
     <input
       type="text"

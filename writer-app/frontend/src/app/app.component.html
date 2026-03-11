@@ -58,6 +58,7 @@
   <!-- Centre : éditeur + suggestions inline -->
   <div class="editor-area">
     <app-document-editor
+      #documentEditor
       *ngIf="currentDocument"
       [document]="currentDocument"
       [patches]="pendingPatches"

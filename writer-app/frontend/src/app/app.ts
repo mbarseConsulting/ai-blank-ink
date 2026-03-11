@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, HostListener, inject, OnInit } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  HostListener,
+  OnInit,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { invoke } from '@tauri-apps/api/core';
 import { DocumentModel, DocumentNode, PatchModel, SkillName } from './models';
@@ -108,6 +115,9 @@ export class App implements OnInit {
   /** Message bref après sauvegarde (ex. "Enregistré", "Erreur"). */
   saveIndicator = '';
 
+  @ViewChild('documentEditor', { static: false })
+  editorComponent?: DocumentEditorComponent;
+
   get currentDocumentSafe(): DocumentModel {
     return this.currentDocument;
   }
@@ -132,6 +142,8 @@ export class App implements OnInit {
         content,
         history: [],
       };
+      // Clear any suggestions from the previous document.
+      this.pendingPatches = [];
     } catch (error) {
       // Future: afficher un toast / message d’erreur.
       console.error('Failed to open document', error);
@@ -143,35 +155,20 @@ export class App implements OnInit {
   }
 
   runSelectedSkill(): void {
-    if (!this.selectedSkillName) return;
+    if (!this.selectedSkillName || !this.editorComponent) return;
 
-    const beforeSnippet = this.currentDocument.content.split('\n').slice(5, 9).join('\n');
-    const mockPatch: PatchModel = {
-      id: `patch-${Date.now()}`,
-      skillRunId: `run-${Date.now()}`,
-      startOffset: 0,
-      endOffset: beforeSnippet.length,
-      beforeText: beforeSnippet,
-      afterText: beforeSnippet.replace(
-        'Les rayonnages montaient haut',
-        '[QA lecture] Les rayonnages montaient haut'
-      ),
-      status: 'pending',
-      axis: `${this.selectedSkillName}:mock`,
-      note: 'Mock qa-reader suggestion on the opening paragraph.',
-    };
-
-    this.pendingPatches = [mockPatch];
+    if (this.selectedSkillName === 'qa-originality') {
+      const patches = this.editorComponent.createMockOriginalityPatches?.() ?? [];
+      if (!patches.length) return;
+      this.pendingPatches = [...this.pendingPatches, ...patches];
+    } else {
+      const patch = this.editorComponent.createMockPatch(this.selectedSkillName);
+      if (!patch) return;
+      this.pendingPatches = [...this.pendingPatches, patch];
+    }
   }
 
   acceptPatch(patch: PatchModel): void {
-    // naive apply based on start/end offsets on current content
-    const before = this.currentDocument.content.slice(0, patch.startOffset);
-    const after = this.currentDocument.content.slice(patch.endOffset);
-    this.currentDocument = {
-      ...this.currentDocument,
-      content: before + patch.afterText + after,
-    };
     this.pendingPatches = this.pendingPatches.filter((p) => p.id !== patch.id);
   }
 

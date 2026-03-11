@@ -14,3 +14,50 @@ body {
 body {
   overflow: hidden;
 }
+
+/* Inline patch highlight + suggestion widget for CodeMirror */
+.cm-patch-before {
+  background-color: rgba(255, 0, 0, 0.6); /* red for current text */
+  border-radius: 2px;
+}
+
+.cm-patch-suggestion {
+  margin: 4px 0 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background-color: rgba(25, 255, 100, 0.4); /* bright green for suggestion */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cm-patch-suggestion-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.cm-patch-suggestion-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.cm-patch-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.cm-patch-btn-apply {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.cm-patch-btn-cancel {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #1f2937;
+}
