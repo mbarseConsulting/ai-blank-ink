@@ -139,6 +139,13 @@ export class App implements OnInit {
     return this.availableSkills.find((s) => s.name === this.selectedSkillName) ?? null;
   }
 
+  openAnalysisDesk(): void {
+    if (!this.currentDocument.path) return;
+    invoke('open_analysis_window', { path: this.currentDocument.path }).catch((err) =>
+      console.error('Failed to open analysis window', err)
+    );
+  }
+
   async onNodeClick(node: DocumentNode, event: MouseEvent): Promise<void> {
     event.stopPropagation();
 

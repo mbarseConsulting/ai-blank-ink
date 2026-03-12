@@ -73,6 +73,15 @@
 
   <!-- Colonne droite : skills + propositions -->
   <aside class="sidebar-right">
+    <button
+      type="button"
+      class="analysis-open-button"
+      (click)="openAnalysisDesk()"
+      [disabled]="!currentDocument.path"
+    >
+      Ouvrir le bureau d’analyse
+    </button>
+
     <app-skills-panel
       [skills]="availableSkills"
       [selectedSkill]="selectedSkillName"

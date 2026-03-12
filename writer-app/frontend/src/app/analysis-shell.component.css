@@ -1,0 +1,71 @@
+.analysis-layout {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  grid-template-rows: 100vh;
+  background: #020617;
+  color: #e5e7eb;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.analysis-rail {
+  border-right: 1px solid #111827;
+  padding: 12px;
+  background: #020617;
+}
+
+.analysis-rail-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.analysis-rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.analysis-rail-item {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #020617;
+  border: 1px solid #1f2937;
+}
+
+.analysis-main {
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.analysis-header {
+  margin-bottom: 16px;
+}
+
+.analysis-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.analysis-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.analysis-placeholder {
+  margin-top: 24px;
+  font-size: 13px;
+}
+
+.analysis-hint {
+  margin-top: 8px;
+  color: #9ca3af;
+}
+

@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use chrono::Utc;
 use reqwest::Client;
+use tauri::Manager;
 use uuid::Uuid;
 
 // Dossier racine du workspace pendant le dev :
@@ -178,6 +179,45 @@ fn open_document(path: String) -> Result<String, String> {
 fn save_document(path: String, content: String) -> Result<(), String> {
   let full = resolve_path(&path);
   std::fs::write(&full, content).map_err(|e| e.to_string())
+}
+
+/// Ouvre (ou affiche) la fenêtre d'analyse dédiée aux rapports de skills.
+/// Important: command async pour éviter le deadlock Webview2 sous Windows.
+#[tauri::command]
+async fn open_analysis_window(window: tauri::AppHandle, path: Option<String>) -> Result<(), String> {
+  // Essayer de récupérer une fenêtre existante.
+  if let Some(win) = window.get_webview_window("analysis") {
+    if let Err(e) = win.show() {
+      return Err(e.to_string());
+    }
+    if let Err(e) = win.set_focus() {
+      return Err(e.to_string());
+    }
+  } else {
+    // Créer une nouvelle fenêtre pointant vers la même app mais avec un hash #analysis.
+    // En dev, on pointe explicitement sur le devUrl avec #analysis pour éviter les soucis de chemin.
+    #[cfg(debug_assertions)]
+    let url = tauri::WebviewUrl::External(
+      "http://localhost:4200/#analysis"
+        .parse()
+        .expect("invalid dev URL for analysis window"),
+    );
+
+    #[cfg(not(debug_assertions))]
+    let url = tauri::WebviewUrl::App("index.html#analysis".into());
+
+    tauri::WebviewWindowBuilder::new(&window, "analysis", url)
+    .title("Ghost Writer – Analysis Desk")
+    .inner_size(1200.0, 800.0)
+    .resizable(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+  }
+
+  // TODO: utiliser `path` pour envoyer un événement à la fenêtre d'analyse
+  // afin qu'elle sache quel document est actif.
+
+  Ok(())
 }
 
 // ---------- Gemini integration: qa-reader (diagnostics only) ----------
@@ -417,6 +457,7 @@ pub fn run() {
       list_stories_tree,
       open_document,
       save_document,
+      open_analysis_window,
       run_skill_mock,
       run_skill
     ])
