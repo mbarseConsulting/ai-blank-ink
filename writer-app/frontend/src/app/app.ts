@@ -9,7 +9,13 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { invoke } from '@tauri-apps/api/core';
-import { DocumentModel, DocumentNode, PatchModel, SkillName } from './models';
+import {
+  DocumentModel,
+  DocumentNode,
+  PatchModel,
+  SkillName,
+  SkillRunModel,
+} from './models';
 import { DocumentEditorComponent } from './document-editor.component';
 import { SkillsPanelComponent } from './skills-panel.component';
 
@@ -114,12 +120,23 @@ export class App implements OnInit {
   promptText = '';
   /** Message bref après sauvegarde (ex. "Enregistré", "Erreur"). */
   saveIndicator = '';
+  /** Dernier diagnostic textuel (ex. qa-reader) affiché dans le panneau droit. */
+  lastDiagnosticMessage: string | null = null;
+  /** Question de suivi pour le panneau de diagnostic. */
+  diagnosticFollowupText: string = '';
 
   @ViewChild('documentEditor', { static: false })
   editorComponent?: DocumentEditorComponent;
 
   get currentDocumentSafe(): DocumentModel {
     return this.currentDocument;
+  }
+
+  get selectedSkillDefinition():
+    | { name: SkillName; label: string; description: string }
+    | null {
+    if (!this.selectedSkillName) return null;
+    return this.availableSkills.find((s) => s.name === this.selectedSkillName) ?? null;
   }
 
   async onNodeClick(node: DocumentNode, event: MouseEvent): Promise<void> {
@@ -154,26 +171,69 @@ export class App implements OnInit {
     this.selectedSkillName = name;
   }
 
-  runSelectedSkill(): void {
-    if (!this.selectedSkillName || !this.editorComponent) return;
+  async runSelectedSkill(): Promise<void> {
+    if (!this.selectedSkillName || !this.currentDocument.path) return;
 
-    if (this.selectedSkillName === 'qa-originality') {
-      const patches = this.editorComponent.createMockOriginalityPatches?.() ?? [];
-      if (!patches.length) return;
-      this.pendingPatches = [...this.pendingPatches, ...patches];
-    } else {
-      const patch = this.editorComponent.createMockPatch(this.selectedSkillName);
-      if (!patch) return;
-      this.pendingPatches = [...this.pendingPatches, patch];
+    try {
+      if (this.selectedSkillName === 'qa-reader') {
+        // Premier vrai skill: appel modèle, diagnostics uniquement pour l’instant.
+        const run = await invoke<SkillRunModel>('run_skill', {
+          skillName: this.selectedSkillName,
+          path: this.currentDocument.path,
+          mode: 'analysis',
+          followUp: null,
+          previousMessage: null,
+        });
+        const first = run.diagnostics?.[0];
+        this.lastDiagnosticMessage = first?.message ?? null;
+        this.cdr.detectChanges();
+        return;
+      }
+
+      // Pour les autres skills, on reste sur le mock Tauri qui renvoie un patch.
+      const run = await invoke<SkillRunModel>('run_skill_mock', {
+        skillName: this.selectedSkillName,
+        path: this.currentDocument.path,
+        mode: 'analysis',
+      });
+      if (!run || !run.patches?.length) return;
+      this.pendingPatches = [...this.pendingPatches, ...run.patches];
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Failed to run skill', error);
     }
   }
 
   acceptPatch(patch: PatchModel): void {
     this.pendingPatches = this.pendingPatches.filter((p) => p.id !== patch.id);
+    this.cdr.detectChanges();
   }
 
   rejectPatch(patch: PatchModel): void {
     this.pendingPatches = this.pendingPatches.filter((p) => p.id !== patch.id);
+    this.cdr.detectChanges();
+  }
+
+  async sendDiagnosticFollowup(): Promise<void> {
+    const text = this.diagnosticFollowupText.trim();
+    if (!text || !this.currentDocument.path || this.selectedSkillName !== 'qa-reader') {
+      return;
+    }
+    try {
+      const run = await invoke<SkillRunModel>('run_skill', {
+        skillName: this.selectedSkillName,
+        path: this.currentDocument.path,
+        mode: 'analysis',
+        followUp: text,
+        previousMessage: this.lastDiagnosticMessage,
+      });
+      const first = run.diagnostics?.[0];
+      this.lastDiagnosticMessage = first?.message ?? null;
+      this.diagnosticFollowupText = '';
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Failed to continue diagnostic conversation', error);
+    }
   }
 
   @HostListener('document:keydown', ['$event'])

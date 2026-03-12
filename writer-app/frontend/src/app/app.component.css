@@ -351,3 +351,83 @@ app-document-editor {
   color: white;
 }
 
+/* Panneau de diagnostic texte pour qa-reader & co */
+.diagnostics-panel {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #020617;
+  border: 1px solid #1f2937;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.diagnostics-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.diagnostics-body {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.diagnostics-followup {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diagnostics-input {
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+  font-size: 12px;
+  padding: 4px 6px;
+  resize: vertical;
+}
+
+.diagnostics-send {
+  align-self: flex-end;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.diagnostics-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.skill-meta {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #020617;
+  border: 1px solid #1f2937;
+}
+
+.skill-meta-title {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skill-meta-desc {
+  margin: 0;
+  font-size: 11px;
+  color: #9ca3af;
+}
+

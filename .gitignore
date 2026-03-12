@@ -4,3 +4,8 @@
 .claude/settings.local.json
 
 stories/
+
+# Local API keys / config (do not commit)
+.env
+.env.local
+ai-blank-ink.config.json
