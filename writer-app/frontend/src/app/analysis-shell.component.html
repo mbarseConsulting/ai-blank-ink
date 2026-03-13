@@ -11,18 +11,66 @@
   <section class="analysis-main">
     <header class="analysis-header">
       <h1 class="analysis-title">Ink Intelligence Desk</h1>
-      <p class="analysis-subtitle">
-        Sélectionne un run de skill depuis la fenêtre principale pour voir ses rapports ici.
+      <p class="analysis-subtitle" *ngIf="activeDocumentPath; else noDoc">
+        Document : <strong>{{ activeDocumentPath }}</strong>
+        <span *ngIf="activeSkillName"> • Skill : {{ activeSkillName }}</span>
       </p>
+      <ng-template #noDoc>
+        <p class="analysis-subtitle">
+          Aucun rapport chargé. Lance un skill (par ex. <code>qa-reader</code>) depuis la fenêtre principale.
+        </p>
+      </ng-template>
     </header>
 
-    <div class="analysis-placeholder">
-      <p>Aucun rapport chargé pour le moment.</p>
-      <p class="analysis-hint">
-        Depuis la fenêtre principale, lance par exemple <code>qa-reader</code>, puis ouvre ce bureau
-        d’analyse.
-      </p>
+    <nav class="analysis-tabs" *ngIf="openSkills.length > 0">
+      <button
+        type="button"
+        class="analysis-tab"
+        *ngFor="let skill of openSkills"
+        [class.analysis-tab--active]="skill === activeSkillName"
+        (click)="selectSkillTab(skill)"
+      >
+        <span class="analysis-tab-label">{{ skill }}</span>
+        <span class="analysis-tab-close" (click)="closeSkillTab(skill, $event)">×</span>
+      </button>
+    </nav>
+
+    <div class="analysis-history" *ngIf="currentRuns.length > 0">
+      <h3 class="analysis-history-title">Historique des réponses</h3>
+      <ul class="analysis-history-list">
+        <li
+          *ngFor="let run of currentRuns; let i = index"
+          class="analysis-history-item"
+          [class.analysis-history-item--active]="i === activeIndex"
+          (click)="selectRun(i)"
+        >
+          <span class="analysis-history-label">
+            Run {{ i + 1 }} – {{ run.createdAt | date: 'shortTime' }}
+          </span>
+        </li>
+      </ul>
     </div>
+
+    <div *ngIf="activeRun; else placeholder">
+      <article class="analysis-report">
+        <h2 class="analysis-report-title">
+          Rapport {{ activeSkillName }}
+        </h2>
+        <pre class="analysis-report-body">
+{{ activeRun.diagnostics?.[0]?.message || 'Aucun message de diagnostic.' }}
+        </pre>
+      </article>
+    </div>
+
+    <ng-template #placeholder>
+      <div class="analysis-placeholder">
+        <p>Aucun rapport chargé pour le moment.</p>
+        <p class="analysis-hint">
+          Depuis la fenêtre principale, lance par exemple <code>qa-reader</code>, puis clique sur « Ouvrir le
+          bureau d’analyse ».
+        </p>
+      </div>
+    </ng-template>
   </section>
 </div>
 

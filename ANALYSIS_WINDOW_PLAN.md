@@ -69,8 +69,8 @@ High-level layout (desktop-only):
 
 Second window and main window communicate via Tauri events and shared `SkillRun` data:
 
-- When a skill is run in the main window:
-  - Main window emits an event (e.g. `skill-run-updated`) with:
+- When un skill “réel” est exécuté dans la fenêtre principale (ex. `qa-reader` avec une demande utilisateur):
+  - La fenêtre principale émet un événement (actuellement `skill-run`) avec:
     - `documentPath`
     - `skillName`
     - `SkillRunModel` (including diagnostics + patches, even if patches are not displayed here).

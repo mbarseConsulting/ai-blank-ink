@@ -19,7 +19,17 @@ fn resolve_path(p: &str) -> PathBuf {
   PathBuf::from(WORKSPACE_ROOT).join(p)
 }
 
-#[derive(serde::Serialize)]
+fn history_dir() -> PathBuf {
+  PathBuf::from(WORKSPACE_ROOT).join("writer-app").join(".analysis-history")
+}
+
+fn history_file_for(path: &str, skill_name: &str) -> PathBuf {
+  let mut slug = path.replace(['/', '\\'], "-");
+  slug = slug.replace('.', "_");
+  history_dir().join(format!("{}.{}.json", slug, skill_name))
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DiagnosticDto {
   id: String,
@@ -32,7 +42,7 @@ struct DiagnosticDto {
   end_offset: Option<usize>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PatchDto {
   id: String,
@@ -47,7 +57,7 @@ struct PatchDto {
   note: Option<String>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SkillRunDto {
   id: String,
@@ -220,6 +230,31 @@ async fn open_analysis_window(window: tauri::AppHandle, path: Option<String>) ->
   Ok(())
 }
 
+/// Charge l’historique des SkillRun pour un document + skill donnés depuis le disque.
+#[tauri::command]
+fn load_skill_run_history(path: String, skill_name: String) -> Result<Vec<SkillRunDto>, String> {
+  let file = history_file_for(&path, &skill_name);
+  if !file.exists() {
+    return Ok(Vec::new());
+  }
+  let data = std::fs::read_to_string(&file).map_err(|e| e.to_string())?;
+  let runs: Vec<SkillRunDto> =
+    serde_json::from_str(&data).map_err(|e| format!("Failed to parse history: {}", e))?;
+  Ok(runs)
+}
+
+/// Sauvegarde l’historique des SkillRun pour un document + skill donnés sur le disque.
+#[tauri::command]
+fn save_skill_run_history(path: String, skill_name: String, runs: Vec<SkillRunDto>) -> Result<(), String> {
+  let dir = history_dir();
+  if let Err(e) = std::fs::create_dir_all(&dir) {
+    return Err(e.to_string());
+  }
+  let file = history_file_for(&path, &skill_name);
+  let json = serde_json::to_string_pretty(&runs).map_err(|e| e.to_string())?;
+  std::fs::write(&file, json).map_err(|e| e.to_string())
+}
+
 // ---------- Gemini integration: qa-reader (diagnostics only) ----------
 
 #[derive(serde::Serialize)]
@@ -294,7 +329,12 @@ async fn run_skill(
     role: "user".to_string(),
     parts: vec![GeminiPart {
       text: format!(
-        "You are the /{} skill from AI Write Ink. Follow these instructions exactly:\n\n{}",
+        "You are the /{} skill from AI Write Ink.\n\
+Follow these instructions exactly.\n\
+IMPORTANT CONSTRAINTS:\n\
+- Never paste or quote the original story text in your answer.\n\
+- Do NOT include large excerpts from the input; refer to scenes/paragraphs descriptively.\n\
+- Output only your analysis and conclusions.\n\n{}",
         skill_name, skill_instructions
       ),
     }],
@@ -458,6 +498,8 @@ pub fn run() {
       open_document,
       save_document,
       open_analysis_window,
+      load_skill_run_history,
+      save_skill_run_history,
       run_skill_mock,
       run_skill
     ])

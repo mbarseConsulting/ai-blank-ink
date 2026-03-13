@@ -9,3 +9,6 @@ stories/
 .env
 .env.local
 ai-blank-ink.config.json
+
+# Analysis history (per-user skill reports)
+writer-app/.analysis-history/

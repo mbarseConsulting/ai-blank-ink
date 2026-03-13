@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
 import {
   DocumentModel,
   DocumentNode,
@@ -141,9 +142,19 @@ export class App implements OnInit {
 
   openAnalysisDesk(): void {
     if (!this.currentDocument.path) return;
-    invoke('open_analysis_window', { path: this.currentDocument.path }).catch((err) =>
-      console.error('Failed to open analysis window', err)
-    );
+    const currentPath = this.currentDocument.path;
+    invoke('open_analysis_window', { path: currentPath })
+      .then(() => {
+        // Petite attente pour laisser le temps à la fenêtre d'analyse
+        // de se charger et d'attacher ses listeners.
+        setTimeout(() => {
+          console.log('Emitting analysis-init for', currentPath);
+          emit('analysis-init', {
+            documentPath: currentPath,
+          }).catch((err) => console.error('Failed to emit analysis-init', err));
+        }, 800);
+      })
+      .catch((err) => console.error('Failed to open analysis window', err));
   }
 
   async onNodeClick(node: DocumentNode, event: MouseEvent): Promise<void> {
@@ -183,16 +194,20 @@ export class App implements OnInit {
 
     try {
       if (this.selectedSkillName === 'qa-reader') {
-        // Premier vrai skill: appel modèle, diagnostics uniquement pour l’instant.
-        const run = await invoke<SkillRunModel>('run_skill', {
-          skillName: this.selectedSkillName,
-          path: this.currentDocument.path,
-          mode: 'analysis',
-          followUp: null,
-          previousMessage: null,
-        });
-        const first = run.diagnostics?.[0];
-        this.lastDiagnosticMessage = first?.message ?? null;
+        // Premier clic : expliquer ce que fait le skill et comment formuler la demande,
+        // sans appeler immédiatement l'API.
+        this.lastDiagnosticMessage =
+          "QA lecture (/qa-reader) peut analyser l’expérience de lecture de ton texte.\n\n" +
+          "- Hooks : est-ce que le début donne envie de continuer ?\n" +
+          "- Rythme : alternance lenteur / accélération, passages trop statiques.\n" +
+          "- Tension : où la tension monte, où elle retombe trop.\n" +
+          "- Engagement : où le lecteur risque de décrocher.\n\n" +
+          "Dans le champ ci-dessous, précise ce que tu veux :\n" +
+          'Exemples :\n' +
+          '- \"Concentre-toi sur le rythme de la scène 1.\"\n' +
+          '- \"Dis-moi où la tension retombe dans la scène 2.\"\n' +
+          '- \"Analyse uniquement l’ouverture et dis-moi si le hook fonctionne.\"';
+        this.diagnosticFollowupText = '';
         this.cdr.detectChanges();
         return;
       }
@@ -232,11 +247,28 @@ export class App implements OnInit {
         path: this.currentDocument.path,
         mode: 'analysis',
         followUp: text,
-        previousMessage: this.lastDiagnosticMessage,
+        // On envoie toujours le texte complet + l’instruction détaillée;
+        // pas besoin de renvoyer le message précédent en contexte pour le premier vrai run.
+        previousMessage: null,
+      });
+      console.log('qa-reader run completed, emitting skill-run event', {
+        path: this.currentDocument.path,
+        skill: this.selectedSkillName,
+        diagnosticsCount: run.diagnostics?.length ?? 0,
       });
       const first = run.diagnostics?.[0];
       this.lastDiagnosticMessage = first?.message ?? null;
       this.diagnosticFollowupText = '';
+      // Diffuser le SkillRun complet vers la fenêtre d'analyse (si ouverte).
+      emit('skill-run', {
+        documentPath: this.currentDocument.path,
+        skillName: this.selectedSkillName,
+        run,
+      })
+        .then(() => {
+          console.log('skill-run event emitted');
+        })
+        .catch((err) => console.error('Failed to emit skill-run event', err));
       this.cdr.detectChanges();
     } catch (error) {
       console.error('Failed to continue diagnostic conversation', error);

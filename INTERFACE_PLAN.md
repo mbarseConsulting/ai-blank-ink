@@ -382,13 +382,16 @@ Cursor devient **une option de front-end**, pas un prérequis.
 
 ## 10. Prochaines étapes d’implémentation
 
-1. **Passer du mock aux vrais skills**
-   - Créer des commandes Tauri :
-     - `run_skill(skillName: String, path: String, range: Option<Range>) -> SkillRunModel`.
-   - Lire les `SKILL.md` / `agent-*.md` depuis `deps/ai-write-ink`, `deps/ai-forge-ink`, etc.
-   - Construire les prompts, appeler l’API modèle et renvoyer de vrais `diagnostics[]` + `patches[]`.
+1. **Généraliser les vrais skills (au-delà de `qa-reader`)**
+   - Étendre la commande Tauri :
+     - `run_skill(skillName: String, path: String, mode: String, followUp?: String, previousMessage?: String) -> SkillRunModel`.
+   - Lire les `SKILL.md` / `agent-*.md` depuis `deps/ai-write-ink`, `deps/ai-forge-ink`, etc., et adapter les prompts par skill :
+     - `qa-reader` : rapport d’analyse de lecture uniquement (`diagnostics[]`), sans recracher le texte source.
+     - `qa-originality` : diagnostics sur la voix et originalité, même schéma.
+     - `edit-ai-fr` / `qa-prose` : diagnostics + `patches[]` structurés pour alimenter les suggestions inline dans CodeMirror.
    - Côté Angular :
-     - Remplacer `createMockPatch` / `createMockOriginalityPatches` par les données renvoyées par Tauri.
+     - Utiliser `run_skill` pour les skills intégrés et garder `run_skill_mock` comme fallback pour les autres.
+     - Continuer à émettre les `SkillRun` vers le bureau d’analyse (fenêtre 2) pour les rapports longs.
 
 2. **Gestion avancée des patches**
    - Grouper les suggestions par `SkillRun` + `axis` dans le panneau droit.
