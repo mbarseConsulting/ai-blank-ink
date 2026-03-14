@@ -160,6 +160,7 @@ These colors are used for tags, badges, run history markers, and section heading
 
 - Report reader (zone centrale) :
   - Affiche `activeRun.diagnostics[0].message` comme corps principal du rapport (rapport “éditorial”).
+  - **Rendu Markdown** : gras `**texte**`, italique `*texte*`, listes à puces (`-` ou `*`), retours à la ligne conservés. Parsing maison (pas de lib externe), échappement XSS (`<`, `>`, `&`). Styles dédiés pour `strong`, `em`, listes, paragraphes.
   - Pour `edit-ai-fr`, ce message inclut également un bloc listant les suggestions détectées sous forme :
     - `ORIGINAL / REPLACEMENT / EXPLANATION` (données issues du JSON structuré renvoyé par Gemini, et réinjectées par le backend).
 

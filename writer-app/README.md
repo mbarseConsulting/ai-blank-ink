@@ -1,16 +1,25 @@
 # AI Blank Ink – Writer App (Tauri + Angular)
 
-Cette app desktop sera l’atelier d’écriture qui orchestre les skills
-(`calibrate-ink`, `arch-ink`, `qa-reader`, `qa-originality`, `edit-ai-fr`, …)
+Cette app desktop est l’atelier d’écriture qui orchestre les skills
+(`qa-reader`, `qa-originality`, `qa-prose`, `write-ink`, `cowrite-ink`, `edit-ai-fr`, …)
 directement sur les fichiers du projet (`stories/`, `deps/...`).
+
+## Configuration
+
+- Clé API : `writer-app/.env` (non committé) avec `GEMINI_API_KEY=...`
+- Le backend charge cette clé via `dotenvy` pour les appels Gemini.
+
+## Fonctionnalités récentes
+
+- **Footer de conversation** : les réponses des skills s’affichent dans un footer redimensionnable sous l’éditeur, avec champ de suivi. Entrée = envoi, Shift+Entrée = nouvelle ligne.
+- **Rendu Markdown** : réponses des skills (footer + bureau d’analyse) affichées en **gras**, *italique*, listes à puces, paragraphes. Parsing maison, échappement XSS.
+- **write-ink** et **cowrite-ink** branchés sur Gemini (génération, réécriture, brainstorm/critique).
+- **Bureau d’analyse** : rapports en Markdown, historique persistant par document+skill.
 
 Ce dossier contient :
 
 - `frontend/` – app Angular (UI)
 - `src-tauri/` – app Tauri (shell desktop + commandes Rust)
-
-> Note : la structure ci-dessous est posée comme squelette. Les commandes
-> Angular/Tauri réelles (ng new, tauri init) pourront être branchées ensuite.
 
 ## Structure cible
 

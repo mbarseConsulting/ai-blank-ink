@@ -2,6 +2,7 @@ export type SkillName =
   | 'calibrate-ink'
   | 'arch-ink'
   | 'write-ink'
+  | 'cowrite-ink'
   | 'qa-reader'
   | 'qa-originality'
   | 'qa-prose'

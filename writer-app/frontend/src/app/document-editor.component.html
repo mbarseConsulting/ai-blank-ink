@@ -26,17 +26,4 @@
       [ngClass]="['font-' + fontId, 'size-' + fontSize]"
     ></div>
   </section>
-
-  <footer class="prompt-bar">
-    <input
-      type="text"
-      class="prompt-input"
-      placeholder="Parler à l’atelier (ex : 'diagnostique l’ouverture', 'propose un titre')"
-      [ngModel]="promptText"
-      (ngModelChange)="onPromptChange($event)"
-      (keyup.enter)="onSendPrompt()"
-    />
-    <button class="prompt-send" (click)="onSendPrompt()">Envoyer</button>
-  </footer>
 </main>
-

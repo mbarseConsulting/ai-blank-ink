@@ -371,7 +371,7 @@ Cursor devient **une option de front-end**, pas un prérequis.
 ### 9.4. Skills réels & Gemini
 
 - Intégration d’un premier moteur LLM réel via **Gemini** (API HTTP depuis Rust, `reqwest`) :
-  - Clé `GEMINI_API_KEY` et modèle `GEMINI_MODEL` lus depuis l’environnement (par défaut `gemini-2.5-flash-lite`).
+  - Clé `GEMINI_API_KEY` chargée depuis `writer-app/.env` via `dotenvy` (fallback sur variable d'environnement). Modèle `GEMINI_MODEL` lus depuis l’environnement (par défaut `gemini-2.5-flash-lite`).
   - Chargement automatique des instructions de skills (`SKILL.md` + `agent-<skill>.md`) depuis `deps/ai-write-ink/skills/<skillName>/` via `load_skill_bundle`.
   - Skills actuellement branchés sur Gemini via `run_skill` :
     - `qa-reader` : rapport critique de lecture, avec contrainte stricte de **ne pas recracher le texte source** (uniquement analyse).
@@ -390,7 +390,7 @@ Cursor devient **une option de front-end**, pas un prérequis.
 - Côté Angular (`AnalysisShellComponent`) :
   - Bootstrap conditionnel dans `main.ts` en fonction du hash `#analysis`.
   - Écoute des événements Tauri :
-    - `analysis-init` : déclenche le chargement de l’historique pour tous les skills supportés (`qa-reader`, `qa-originality`, `qa-prose`, `edit-ai-fr`) depuis des fichiers JSON locaux.
+    - `analysis-init` : déclenche le chargement de l’historique pour tous les skills supportés (`qa-reader`, `qa-originality`, `qa-prose`, `write-ink`, `cowrite-ink`, `edit-ai-fr`) depuis des fichiers JSON locaux.
     - `skill-run` : ajoute un nouveau run dans l’historique et sauve immédiatement la mise à jour sur disque.
   - Historique persistant :
     - Un fichier `.analysis-history/*.json` par `(document, skill)` (ignorés par Git).
@@ -398,7 +398,7 @@ Cursor devient **une option de front-end**, pas un prérequis.
   - UI actuelle :
     - **Tabs par skill** (style “Chrome-like”), ouverts uniquement pour les skills ayant de l’historique ou après un nouveau run.
     - **Run history** vertical pour le skill actif, avec sélection de la version.
-    - **Report reader** central affichant le diagnostic principal (rapport) et, pour `edit-ai-fr`, un récapitulatif des suggestions `ORIGINAL / REPLACEMENT / EXPLICATION`.
+    - **Report reader** central : affichage du diagnostic principal avec **rendu Markdown** (gras, italique, listes, paragraphes). Parsing maison, échappement XSS. Pour `edit-ai-fr`, récapitulatif des suggestions `ORIGINAL / REPLACEMENT / EXPLICATION`.
 
 ---
 

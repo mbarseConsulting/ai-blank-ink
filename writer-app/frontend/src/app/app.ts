@@ -7,6 +7,7 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
@@ -34,6 +35,7 @@ import { SkillsPanelComponent } from './skills-panel.component';
 })
 export class App implements OnInit {
   private cdr = inject(ChangeDetectorRef);
+  private sanitizer = inject(DomSanitizer);
 
   /** Arbre de documents, rempli par le scan Tauri de stories/. */
   documentTree: DocumentNode[] = [];
@@ -87,6 +89,16 @@ export class App implements OnInit {
       description: 'Fixer genre et conventions de lecture (calibration).',
     },
     {
+      name: 'write-ink',
+      label: 'write-ink',
+      description: 'Prose narrative : scènes, chapitres, continuations, réécritures ciblées.',
+    },
+    {
+      name: 'cowrite-ink',
+      label: 'cowrite-ink',
+      description: 'Directeur créatif : brainstorm, direction, critique sur demande.',
+    },
+    {
       name: 'qa-prose',
       label: 'qa-prose',
       description: 'POV, show/tell, description, dialogue (ligne à ligne).',
@@ -133,7 +145,6 @@ export class App implements OnInit {
 
   pendingPatches: PatchModel[] = [];
   selectedSkillName: SkillName | null = null;
-  promptText = '';
   /** Message bref après sauvegarde (ex. "Enregistré", "Erreur"). */
   saveIndicator = '';
   /** Dernier diagnostic textuel (ex. qa-reader) affiché dans le panneau droit. */
@@ -141,11 +152,37 @@ export class App implements OnInit {
   /** Question de suivi pour le panneau de diagnostic. */
   diagnosticFollowupText: string = '';
 
+  /** Hauteur du footer en px (null = comportement par défaut max 33%). */
+  skillFooterHeightPx: number | null = null;
+  private footerResizing = false;
+  private footerResizeStartY = 0;
+  private footerResizeStartHeight = 0;
+
   @ViewChild('documentEditor', { static: false })
   editorComponent?: DocumentEditorComponent;
 
   get currentDocumentSafe(): DocumentModel {
     return this.currentDocument;
+  }
+
+  get renderedDiagnosticHtml(): SafeHtml | null {
+    if (!this.lastDiagnosticMessage) return null;
+    const html = this.simpleMarkdownToHtml(this.lastDiagnosticMessage);
+    return this.sanitizer.bypassSecurityTrustHtml(html);
+  }
+
+  private simpleMarkdownToHtml(text: string): string {
+    let out = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    out = out.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    out = out.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+    out = out.replace(/(<li>.*<\/li>\n?)+/gs, (m) => `<ul>${m}</ul>`);
+    out = out.replace(/\n\n/g, '</p><p>');
+    out = out.replace(/\n/g, '<br>');
+    return '<p>' + out + '</p>';
   }
 
   get selectedSkillDefinition():
@@ -203,7 +240,12 @@ export class App implements OnInit {
   }
 
   selectSkill(name: SkillName): void {
+    if (this.selectedSkillName !== name) {
+      this.lastDiagnosticMessage = null;
+      this.diagnosticFollowupText = '';
+    }
     this.selectedSkillName = name;
+    this.cdr.detectChanges();
   }
 
   async runSelectedSkill(): Promise<void> {
@@ -295,6 +337,38 @@ export class App implements OnInit {
         return;
       }
 
+      if (this.selectedSkillName === 'write-ink') {
+        this.lastDiagnosticMessage =
+          "Write ink (/write-ink) aide à la génération et à la réécriture narrative.\n\n" +
+          "- Prose : scènes, chapitres, continuations.\n" +
+          "- Réécritures ciblées : retravailler un passage sans tout reprendre.\n" +
+          "- Cohérence de ton et de style avec le reste du texte.\n\n" +
+          "Dans le champ ci-dessous, précise ta demande :\n" +
+          'Exemples :\n' +
+          '- "Continue la scène à partir du dernier paragraphe."\n' +
+          '- "Réécris ce passage en raccourcissant d\'un tiers."\n' +
+          '- "Propose une variante pour le dialogue d\'entrée en scène."';
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
+      if (this.selectedSkillName === 'cowrite-ink') {
+        this.lastDiagnosticMessage =
+          "Co-write ink (/cowrite-ink) agit comme directeur créatif : brainstorm et critique.\n\n" +
+          "- Brainstorm : idées, directions possibles, pistes narratives.\n" +
+          "- Direction : orienter le projet, identifier les risques.\n" +
+          "- Critique : feedback sur demande, sans réécrire la prose.\n\n" +
+          "Dans le champ ci-dessous, précise ce que tu veux :\n" +
+          'Exemples :\n' +
+          '- "On tourne en rond pour la scène 3, propose des pistes."\n' +
+          '- "Critique le rythme global de cette nouvelle."\n' +
+          '- "Comment éviter la chute prévisible ?"';
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
       if (this.selectedSkillName === 'edit-ai-fr') {
         this.lastDiagnosticMessage =
           "Langue FR (/edit-ai-fr) peut proposer des corrections détaillées de la langue et nettoyer les artefacts IA.\n\n" +
@@ -335,6 +409,34 @@ export class App implements OnInit {
     this.cdr.detectChanges();
   }
 
+  startFooterResize(event: MouseEvent): void {
+    event.preventDefault();
+    this.footerResizing = true;
+    this.footerResizeStartY = event.clientY;
+    const editorArea = document.querySelector('.editor-area')?.getBoundingClientRect();
+    const footer = document.querySelector('.skill-footer')?.getBoundingClientRect();
+    this.footerResizeStartHeight = footer ? footer.height : 200;
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onFooterResizeMove(event: MouseEvent): void {
+    if (!this.footerResizing) return;
+    const deltaY = this.footerResizeStartY - event.clientY;
+    let newHeight = Math.max(80, Math.min(window.innerHeight * 0.6, this.footerResizeStartHeight + deltaY));
+    this.skillFooterHeightPx = Math.round(newHeight);
+    this.cdr.detectChanges();
+  }
+
+  @HostListener('document:mouseup')
+  onFooterResizeEnd(): void {
+    this.footerResizing = false;
+  }
+
+  resetFooterHeight(): void {
+    this.skillFooterHeightPx = null;
+    this.cdr.detectChanges();
+  }
+
   onDiagnosticsKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -353,6 +455,8 @@ export class App implements OnInit {
       this.selectedSkillName !== 'qa-prose' &&
       this.selectedSkillName !== 'qa-characters' &&
       this.selectedSkillName !== 'qa-consistency' &&
+      this.selectedSkillName !== 'write-ink' &&
+      this.selectedSkillName !== 'cowrite-ink' &&
       this.selectedSkillName !== 'edit-ai-fr'
     ) {
       return;
@@ -430,9 +534,4 @@ export class App implements OnInit {
     }
   }
 
-  sendPrompt(): void {
-    if (!this.promptText.trim()) return;
-    // Future: route to Tauri command / subagent
-    this.promptText = '';
-  }
 }

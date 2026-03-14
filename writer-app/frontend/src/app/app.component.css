@@ -172,15 +172,124 @@
   height: 100%;  /* prend toute la hauteur de la cellule centrale */
   background: #020617;
   color: #e5e7eb;
-  overflow-y: auto; /* permet de scroller quand le contenu dépasse */
+  overflow: hidden;
 }
 
 /* Assure que l’éditeur interne occupe bien toute la hauteur disponible */
+.editor-main {
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 app-document-editor {
   flex: 1;
   min-height: 0;
   height: 100%;
   display: flex;
+}
+
+.skill-footer-resize-handle {
+  flex-shrink: 0;
+  height: 6px;
+  background: #1e293b;
+  cursor: ns-resize;
+  border-top: 1px solid #334155;
+  border-bottom: 1px solid #0f172a;
+}
+
+.skill-footer-resize-handle:hover {
+  background: #334155;
+}
+
+.skill-footer {
+  flex-shrink: 0;
+  max-height: 33%;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #334155;
+  background: #0f172a;
+  overflow: hidden;
+}
+
+.skill-footer-response {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px 4px;
+  background: #0f172a;
+}
+
+.skill-footer-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+
+.skill-footer-body strong {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.skill-footer-body ul,
+.skill-footer-body ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.skill-footer-body li {
+  margin: 0.25em 0;
+}
+
+.skill-footer-body p {
+  margin: 0.5em 0;
+}
+
+.skill-footer-body p:first-child {
+  margin-top: 0;
+}
+
+.skill-footer-body em {
+  color: #cbd5e1;
+}
+
+.skill-footer-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #334155;
+  background: #1e293b;
+}
+
+.skill-footer-input {
+  flex: 1;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 6px 8px;
+  font-size: 13px;
+  resize: none;
+}
+
+.skill-footer-send {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  align-self: flex-end;
+}
+
+.skill-footer-send:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .editor-pane {

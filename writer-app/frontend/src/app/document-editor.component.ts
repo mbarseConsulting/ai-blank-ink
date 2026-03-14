@@ -35,9 +35,6 @@ export class DocumentEditorComponent
 {
   @Input() document!: DocumentModel;
   @Output() documentContentChange = new EventEmitter<string>();
-  @Input() promptText = '';
-  @Output() promptTextChange = new EventEmitter<string>();
-  @Output() sendPromptRequested = new EventEmitter<void>();
   @Input() patches: PatchModel[] = [];
   @Output() acceptPatch = new EventEmitter<PatchModel>();
   @Output() rejectPatch = new EventEmitter<PatchModel>();
@@ -117,14 +114,6 @@ export class DocumentEditorComponent
   ngOnDestroy(): void {
     window.removeEventListener('patchAction', this.patchActionListener as EventListener);
     this.view?.destroy();
-  }
-
-  onPromptChange(value: any): void {
-    this.promptTextChange.emit(String(value));
-  }
-
-  onSendPrompt(): void {
-    this.sendPromptRequested.emit();
   }
 
   onAcceptPatchClick(patch: PatchModel) {

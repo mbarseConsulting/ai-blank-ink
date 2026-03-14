@@ -55,20 +55,47 @@
     </ng-template>
   </aside>
 
-  <!-- Centre : éditeur + suggestions inline -->
+  <!-- Centre : éditeur + barre de conversation skill -->
   <div class="editor-area">
-    <app-document-editor
-      #documentEditor
-      *ngIf="currentDocument"
-      [document]="currentDocument"
-      [patches]="pendingPatches"
-      (acceptPatch)="acceptPatch($event)"
-      (rejectPatch)="rejectPatch($event)"
-      (documentContentChange)="currentDocument = { ...currentDocument, content: $event }"
-      [promptText]="promptText"
-      (promptTextChange)="promptText = $event"
-      (sendPromptRequested)="sendPrompt()"
-    ></app-document-editor>
+    <div class="editor-main" *ngIf="currentDocument">
+      <app-document-editor
+        #documentEditor
+        [document]="currentDocument"
+        [patches]="pendingPatches"
+        (acceptPatch)="acceptPatch($event)"
+        (rejectPatch)="rejectPatch($event)"
+        (documentContentChange)="currentDocument = { ...currentDocument, content: $event }"
+      ></app-document-editor>
+    </div>
+
+    <div class="skill-footer-resize-handle" *ngIf="selectedSkillName" (mousedown)="startFooterResize($event)"></div>
+    <footer
+      class="skill-footer"
+      *ngIf="selectedSkillName"
+      [style.height.px]="skillFooterHeightPx ?? undefined"
+      [style.max-height]="skillFooterHeightPx == null ? '33%' : 'none'"
+    >
+      <div class="skill-footer-response" *ngIf="lastDiagnosticMessage">
+        <div class="skill-footer-body" [innerHTML]="renderedDiagnosticHtml"></div>
+      </div>
+      <div class="skill-footer-input-row">
+        <textarea
+          class="skill-footer-input"
+          rows="2"
+          [(ngModel)]="diagnosticFollowupText"
+          placeholder="Question pour le skill (ex. Concentre-toi sur les hooks)"
+          (keydown)="onDiagnosticsKeydown($event)"
+        ></textarea>
+        <button
+          type="button"
+          class="skill-footer-send"
+          (click)="sendDiagnosticFollowup()"
+          [disabled]="!diagnosticFollowupText.trim()"
+        >
+          Envoyer
+        </button>
+      </div>
+    </footer>
   </div>
 
   <!-- Colonne droite : skills + propositions -->
@@ -88,35 +115,5 @@
       (skillSelected)="selectSkill($event)"
       (runSkillRequested)="runSelectedSkill()"
     ></app-skills-panel>
-
-    <section class="skill-meta" *ngIf="selectedSkillDefinition">
-      <h3 class="skill-meta-title">{{ selectedSkillDefinition.label }}</h3>
-      <p class="skill-meta-desc">
-        {{ selectedSkillDefinition.description }}
-      </p>
-    </section>
-
-    <section class="diagnostics-panel" *ngIf="lastDiagnosticMessage">
-      <h3 class="diagnostics-title">Dernier diagnostic</h3>
-      <pre class="diagnostics-body">{{ lastDiagnosticMessage }}</pre>
-
-      <div class="diagnostics-followup">
-        <textarea
-          class="diagnostics-input"
-          rows="3"
-          [(ngModel)]="diagnosticFollowupText"
-          placeholder="Poser une question au skill (ex. 'Concentre-toi sur les hooks du début')"
-          (keydown)="onDiagnosticsKeydown($event)"
-        ></textarea>
-        <button
-          type="button"
-          class="diagnostics-send"
-          (click)="sendDiagnosticFollowup()"
-          [disabled]="!diagnosticFollowupText.trim()"
-        >
-          Envoyer au skill
-        </button>
-      </div>
-    </section>
   </aside>
 </div>

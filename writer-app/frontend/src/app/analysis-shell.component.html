@@ -56,9 +56,7 @@
         <h2 class="analysis-report-title">
           Rapport {{ activeSkillName }}
         </h2>
-        <pre class="analysis-report-body">
-{{ activeRun.diagnostics[0]?.message || 'Aucun message de diagnostic.' }}
-        </pre>
+        <div class="analysis-report-body" [innerHTML]="renderedReportHtml"></div>
       </article>
     </div>
 

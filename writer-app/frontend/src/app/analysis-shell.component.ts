@@ -7,6 +7,7 @@ import {
   OnInit,
   inject,
 } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { SkillRunModel, SkillName } from './models';
@@ -21,6 +22,7 @@ import { SkillRunModel, SkillName } from './models';
 export class AnalysisShellComponent implements OnInit, OnDestroy {
   private zone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
+  private sanitizer = inject(DomSanitizer);
 
   activeDocumentPath: string | null = null;
   activeSkillName: SkillName | null = null;
@@ -107,6 +109,8 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
           'qa-prose',
           'qa-characters',
           'qa-consistency',
+          'write-ink',
+          'cowrite-ink',
           'edit-ai-fr',
         ];
 
@@ -135,6 +139,8 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
           'qa-prose',
           'qa-characters',
           'qa-consistency',
+          'write-ink',
+          'cowrite-ink',
           'edit-ai-fr',
         ];
         let chosen: SkillName | null = null;
@@ -174,6 +180,37 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
 
   private makeKey(path: string, skill: SkillName): string {
     return `${path}::${skill}`;
+  }
+
+  get renderedReportHtml(): SafeHtml | null {
+    const msg = this.activeRun?.diagnostics?.[0]?.message;
+    if (!msg) return null;
+    try {
+      const html = this.simpleMarkdownToHtml(msg);
+      return this.sanitizer.bypassSecurityTrustHtml(html);
+    } catch {
+      // Fallback si le parsing markdown plante (ex. contenu inattendu)
+      const escaped = msg
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+      return this.sanitizer.bypassSecurityTrustHtml('<p>' + escaped + '</p>');
+    }
+  }
+
+  private simpleMarkdownToHtml(text: string): string {
+    let out = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    out = out.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    out = out.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+    out = out.replace(/(<li>.*<\/li>\n?)+/gs, (m) => `<ul>${m}</ul>`);
+    out = out.replace(/\n\n/g, '</p><p>');
+    out = out.replace(/\n/g, '<br>');
+    return '<p>' + out + '</p>';
   }
 
   get currentRuns(): SkillRunModel[] {

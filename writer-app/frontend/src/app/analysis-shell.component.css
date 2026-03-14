@@ -177,9 +177,35 @@
   margin: 0;
   font-family: 'Georgia', 'Iowan Old Style', 'Times New Roman', serif;
   font-size: 13px;
-  white-space: pre-wrap;
   background: transparent;
   border: none;
   padding: 0;
+}
+
+.analysis-report-body strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.analysis-report-body ul,
+.analysis-report-body ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.analysis-report-body li {
+  margin: 0.25em 0;
+}
+
+.analysis-report-body p {
+  margin: 0.5em 0;
+}
+
+.analysis-report-body p:first-child {
+  margin-top: 0;
+}
+
+.analysis-report-body em {
+  color: #4b5563;
 }
 

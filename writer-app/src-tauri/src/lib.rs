@@ -363,19 +363,28 @@ async fn run_skill(
 ) -> Result<SkillRunDto, String> {
   // Pour l’instant on ne supporte que qa-reader, qa-originality, qa-prose et edit-ai-fr en vrai appel modèle.
   match skill_name.as_str() {
-    "qa-reader" | "qa-originality" | "qa-prose" | "qa-characters" | "qa-consistency" | "edit-ai-fr" => {
-    }
+    "qa-reader"
+    | "qa-originality"
+    | "qa-prose"
+    | "qa-characters"
+    | "qa-consistency"
+    | "write-ink"
+    | "cowrite-ink"
+    | "edit-ai-fr" => {}
     _ => {
       return Err(
-        "run_skill supports qa-reader, qa-originality, qa-prose, qa-characters, qa-consistency, edit-ai-fr; use run_skill_mock for others."
+        "run_skill supports qa-reader, qa-originality, qa-prose, qa-characters, qa-consistency, write-ink, cowrite-ink, edit-ai-fr; use run_skill_mock for others."
           .to_string(),
       )
     }
   }
 
-  // Clé Gemini (Google AI for Developers)
+  // Clé Gemini : env var ou fichier writer-app/.env (non committé)
+  let env_path = PathBuf::from(WORKSPACE_ROOT).join("writer-app").join(".env");
+  let _ = dotenvy::from_path(&env_path);
+
   let api_key =
-    std::env::var("GEMINI_API_KEY").map_err(|_| "GEMINI_API_KEY is not set".to_string())?;
+    std::env::var("GEMINI_API_KEY").map_err(|_| "GEMINI_API_KEY is not set (add it to writer-app/.env)".to_string())?;
   // Default to a current Gemini model; can be overridden via GEMINI_MODEL env var.
   let model = std::env::var("GEMINI_MODEL")
     .unwrap_or_else(|_| "gemini-2.5-flash-lite".to_string());
@@ -390,11 +399,20 @@ async fn run_skill(
   let skill_instructions = load_skill_bundle(&skill_name)?;
 
   let extra_constraints = match skill_name.as_str() {
-    "qa-reader" | "qa-originality" | "qa-prose" | "qa-characters" | "qa-consistency" => {
+    "qa-reader"
+    | "qa-originality"
+    | "qa-prose"
+    | "qa-characters"
+    | "qa-consistency"
+    | "cowrite-ink" => {
       "IMPORTANT CONSTRAINTS:\n\
 - Never paste or quote the original story text in your answer.\n\
 - Do NOT include large excerpts from the input; refer to scenes/paragraphs descriptively.\n\
 - Output only your analysis and conclusions."
+    }
+    "write-ink" => {
+      "IMPORTANT: When generating new prose (continuation, rewrite), output the generated text directly.\n\
+When giving feedback or analysis, avoid pasting large excerpts from the input."
     }
     "edit-ai-fr" => "MANDATORY OUTPUT FORMAT:\n\
 1. You may start with a short prose summary (optional).\n\
