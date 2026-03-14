@@ -323,14 +323,14 @@ Cursor devient **une option de front-end**, pas un prérequis.
 ### 9.1. Shell desktop & fichiers
 
 - **Tauri 2** initialisé dans `writer-app/src-tauri/` avec :
-  - `open_document(path: String) -> String` – lecture d’un `.md` depuis le repo (ex. `stories/LaGalerie/scene-1.md`).
+  - `open_document(path: String) -> String` – lecture d’un `.md` depuis le repo (ex. `stories/LaGalerie/LaGalerie-complet.md`), avec **normalisation des fins de lignes** en `\n` côté backend pour rester aligné avec CodeMirror.
   - `save_document(path: String, content: String) -> ()` – écriture directe sur le disque.
   - `list_stories_tree() -> DocumentNode[]` – scan récursif de `stories/` et retour d’un arbre `[folder|document]` (chemins relatifs).
 
 - **Frontend Angular** dans `writer-app/frontend/` :
   - Arbre à gauche alimenté par `list_stories_tree` (dossiers + fichiers `.md`).
   - Clic sur un fichier → `open_document` → charge le texte dans `currentDocument`.
-  - Bouton `Enregistrer` + `Ctrl+S` → `save_document` sur le fichier courant, avec indicateur visuel de sauvegarde.
+  - Bouton `Enregistrer` + `Ctrl+S` → `save_document` sur le fichier courant, avec indicateur visuel de sauvegarde (forcé via `ChangeDetectorRef`).
 
 ### 9.2. Éditeur central (CodeMirror 6)
 
@@ -343,15 +343,15 @@ Cursor devient **une option de front-end**, pas un prérequis.
 
 - La zone centrale occupe tout l’espace disponible, avec scroll vertical propre, prompt fixé en bas.
 
-### 9.3. Patches inline (mock)
+### 9.3. Patches inline (réels + mocks)
 
-- **Modèle `PatchModel`** déjà aligné avec le plan (offsets + `beforeText` / `afterText` + `axis` + `note`).
+- **Modèle `PatchModel`** aligné avec le plan (offsets + `beforeText` / `afterText` + `axis` + `note`).
 - Intégration native dans CodeMirror :
   - Chaque patch est rendu comme :
     - Un `Decoration.mark` sur la plage ciblée (`cm-patch-before`) → fond rouge semi‑transparent (texte actuel).
     - Un `Decoration.widget` juste après la plage → bloc vert (`cm-patch-suggestion`) avec :
       - texte suggéré,
-      - boutons `Apply suggestion` / `Cancel`.
+      - boutons `Apply` / `Cancel`.
   - Styles appliqués via `styles.css` (`.cm-patch-before`, `.cm-patch-suggestion`, etc.).
 
 - **Application des suggestions** :
@@ -360,45 +360,58 @@ Cursor devient **une option de front-end**, pas un prérequis.
   - L’éditeur émet ensuite `documentContentChange` vers Angular → `currentDocument.content` est synchronisé.
   - Côté `App`, `acceptPatch` se contente de retirer le patch de `pendingPatches`.
 
-### 9.4. Mocks de skills
+- **Cas actuels** :
+  - `edit-ai-fr` : reçoit de Gemini un bloc JSON structuré (`suggestions[]` avec `original`, `replacement`, `diagnostic`) et le backend Rust convertit ces suggestions en `PatchDto`/`PatchModel` réels pour l’inline editor.  
+    - Côté backend, les offsets sont calculés sur le contenu normalisé (`\n` uniquement).  
+    - Côté UI, il reste à fiabiliser totalement la correspondance `startOffset/endOffset` ↔ `original` (certaines plages sont encore légèrement décalées).
+  - `qa-reader`, `qa-originality`, `qa-prose` : produisent aujourd’hui surtout des diagnostics (rapports longs) affichés dans le **bureau d’analyse** (seconde fenêtre) ; ces skills ne génèrent pas encore de patchs automatiques.
+  - Changement de fichier dans le panneau gauche :
+    - `pendingPatches` est vidé → pas de suggestions résiduelles quand on change de texte.
 
-- **QA lecture (`qa-reader`)** :
-  - `runSelectedSkill` appelle `createMockPatch('qa-reader')` côté éditeur.
-  - Détection exacte du bloc :
-    - `Elle tendit la main vers …` jusqu’à `— Permettez.` via regex sur `EditorState.doc`.
-    - Offsets validés via `doc.sliceString(from, to)` pour éviter les décalages.
-  - `afterText` = bloc identique + ` [TEST]` à la fin pour visualiser l’application.
+### 9.4. Skills réels & Gemini
 
-- **Originalité (`qa-originality`)** :
-  - `runSelectedSkill` détecte ce skill et appelle `createMockOriginalityPatches()` :
-    - Crée plusieurs `PatchModel` sur des phrases arbitraires (ex. : `Les rayonnages montaient haut…`, `Elle regarda autour d'elle…`).
-    - Chaque suggestion ajoute aussi ` [TEST]` en fin de bloc.
-  - Résultat : plusieurs suggestions simultanées, chacune avec son bloc rouge + bloc vert + boutons.
+- Intégration d’un premier moteur LLM réel via **Gemini** (API HTTP depuis Rust, `reqwest`) :
+  - Clé `GEMINI_API_KEY` et modèle `GEMINI_MODEL` lus depuis l’environnement (par défaut `gemini-2.5-flash-lite`).
+  - Chargement automatique des instructions de skills (`SKILL.md` + `agent-<skill>.md`) depuis `deps/ai-write-ink/skills/<skillName>/` via `load_skill_bundle`.
+  - Skills actuellement branchés sur Gemini via `run_skill` :
+    - `qa-reader` : rapport critique de lecture, avec contrainte stricte de **ne pas recracher le texte source** (uniquement analyse).
+    - `qa-originality` : analyse de voix/originalité, même logique de rapport.
+    - `qa-prose` : analyse ligne à ligne de la prose (diagnostics, sans patchs encore).
+    - `edit-ai-fr` : nettoyeur de langue française, renvoyant un bloc JSON structuré pour générer des patchs inline.
+  - Le frontend Angular :
+    - affiche d’abord une **fiche explicative** du skill au premier clic (fonction, usages),
+    - n’appelle réellement `run_skill` qu’après une question de suivi via un champ de saisie dédié (ex. “focalise-toi sur la scène 1…”).
 
-- Changement de fichier dans le panneau gauche :
-  - `pendingPatches` est vidé → pas de suggestions résiduelles quand on change de texte.
+### 9.5. Bureau d’analyse (seconde fenêtre)
+
+- Une seconde fenêtre Tauri (« Ink Intelligence Desk ») est en place :
+  - Créée dynamiquement via la commande `open_analysis_window` (Tauri 2, `WebviewWindowBuilder`).
+  - En dev, charge `http://localhost:4200/#analysis` ; en prod, `index.html#analysis`.
+- Côté Angular (`AnalysisShellComponent`) :
+  - Bootstrap conditionnel dans `main.ts` en fonction du hash `#analysis`.
+  - Écoute des événements Tauri :
+    - `analysis-init` : déclenche le chargement de l’historique pour tous les skills supportés (`qa-reader`, `qa-originality`, `qa-prose`, `edit-ai-fr`) depuis des fichiers JSON locaux.
+    - `skill-run` : ajoute un nouveau run dans l’historique et sauve immédiatement la mise à jour sur disque.
+  - Historique persistant :
+    - Un fichier `.analysis-history/*.json` par `(document, skill)` (ignorés par Git).
+    - Chargement au démarrage de la fenêtre d’analyse.
+  - UI actuelle :
+    - **Tabs par skill** (style “Chrome-like”), ouverts uniquement pour les skills ayant de l’historique ou après un nouveau run.
+    - **Run history** vertical pour le skill actif, avec sélection de la version.
+    - **Report reader** central affichant le diagnostic principal (rapport) et, pour `edit-ai-fr`, un récapitulatif des suggestions `ORIGINAL / REPLACEMENT / EXPLICATION`.
 
 ---
 
 ## 10. Prochaines étapes d’implémentation
 
-1. **Généraliser les vrais skills (au-delà de `qa-reader`)**
-   - Étendre la commande Tauri :
-     - `run_skill(skillName: String, path: String, mode: String, followUp?: String, previousMessage?: String) -> SkillRunModel`.
-   - Lire les `SKILL.md` / `agent-*.md` depuis `deps/ai-write-ink`, `deps/ai-forge-ink`, etc., et adapter les prompts par skill :
-     - `qa-reader` : rapport d’analyse de lecture uniquement (`diagnostics[]`), sans recracher le texte source.
-     - `qa-originality` : diagnostics sur la voix et originalité, même schéma.
-     - `edit-ai-fr` / `qa-prose` : diagnostics + `patches[]` structurés pour alimenter les suggestions inline dans CodeMirror.
-   - Côté Angular :
-     - Utiliser `run_skill` pour les skills intégrés et garder `run_skill_mock` comme fallback pour les autres.
-     - Continuer à émettre les `SkillRun` vers le bureau d’analyse (fenêtre 2) pour les rapports longs.
+1. **Fiabiliser les patches `edit-ai-fr`**
+   - Vérifier systématiquement que `doc.sliceString(startOffset, endOffset)` == `original` avant d’afficher / appliquer un patch.
+   - Si mismatch, marquer le patch comme “inapplicable” dans l’UI au lieu de surligner une mauvaise zone (et lister ces cas dans le bureau d’analyse pour debug).
+   - Envisager un calcul d’offsets plus robuste (par lignes ou par blocs) si nécessaire.
 
-2. **Gestion avancée des patches**
-   - Grouper les suggestions par `SkillRun` + `axis` dans le panneau droit.
-   - Ajouter des actions batch :
-     - `Accepter toutes les propositions de cet axis`.
-     - `Rejeter toutes les propositions de ce SkillRun`.
-   - Journaliser les états (`history[]`) à chaque batch d’acceptation.
+2. **Généraliser les skills côté inline**
+   - Étendre `run_skill` et le parsing pour que `qa-prose` (et plus tard d’autres skills) puissent aussi renvoyer des `suggestions[]` → `patches[]`.
+   - Garder `qa-reader` / `qa-originality` principalement en mode rapports (pas de patch par défaut).
 
 3. **Diagnostics & gutter**
    - Introduire un panneau `Diagnostics` branché sur `DiagnosticModel` (déjà défini dans `models.ts`).
@@ -407,14 +420,14 @@ Cursor devient **une option de front-end**, pas un prérequis.
      - markers dans la gouttière (Gutter Insights).
    - Clic sur un diagnostic → scroll + focus dans l’éditeur.
 
-4. **Persistance & multi-documents**
-   - Ajouter un mini-cache de `SkillRun` par document (mémoire ou fichier `.json` à côté du `.md`).
-   - Gérer les cas où le fichier a changé depuis le dernier run (invalidation des patches obsolètes).
+4. **Améliorations bureau d’analyse**
+   - Affiner le “Report Map” (TOC) et, plus tard, les visualisations spécifiques (`tension graph`, `act map`, etc.).
+   - Ajouter un affichage plus riche des suggestions `edit-ai-fr` (filtres, regroupement, lien explicite vers chaque patch inline).
 
 5. **Polish UX**
    - Thème clair optionnel.
    - Préférences (police/taille par défaut, largeur de colonne).
    - Animation subtile sur apparition / disparition de suggestions.
 
-Ces étapes gardent l’architecture actuelle (Tauri + Angular + CodeMirror + patches inline), mais remplacent progressivement le mock par un flux complet skill → diagnostics → patches → accept/reject.
+Ces étapes gardent l’architecture actuelle (Tauri + Angular + CodeMirror + patches inline + bureau d’analyse multi-fenêtre), et visent surtout à rendre les corrections `edit-ai-fr` totalement fiables et à élargir progressivement l’inline editing à d’autres skills.
 

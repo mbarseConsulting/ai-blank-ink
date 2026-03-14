@@ -106,6 +106,7 @@
           rows="3"
           [(ngModel)]="diagnosticFollowupText"
           placeholder="Poser une question au skill (ex. 'Concentre-toi sur les hooks du début')"
+          (keydown)="onDiagnosticsKeydown($event)"
         ></textarea>
         <button
           type="button"

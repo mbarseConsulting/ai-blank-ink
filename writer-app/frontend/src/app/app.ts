@@ -83,28 +83,43 @@ export class App implements OnInit {
   availableSkills: { name: SkillName; label: string; description: string }[] = [
     {
       name: 'calibrate-ink',
-      label: 'Calibrer (genre)',
-      description: 'Fixer genre et conventions de lecture.',
+      label: 'calibrate-ink',
+      description: 'Fixer genre et conventions de lecture (calibration).',
+    },
+    {
+      name: 'qa-prose',
+      label: 'qa-prose',
+      description: 'POV, show/tell, description, dialogue (ligne à ligne).',
     },
     {
       name: 'arch-ink',
-      label: 'Structure',
-      description: 'Analyse des actes, arcs, climax.',
+      label: 'arch-ink',
+      description: 'Analyse structurelle (acts, arcs, climax).',
     },
     {
       name: 'qa-reader',
-      label: 'QA lecture',
-      description: 'Hooks, tension, rythme, engagement.',
+      label: 'qa-reader',
+      description: 'Hooks, tension, rythme, engagement (expérience de lecture).',
     },
     {
       name: 'qa-originality',
-      label: 'Originalité',
-      description: 'Clichés vs singularité de la voix.',
+      label: 'qa-originality',
+      description: 'Clichés vs singularité de la voix et des idées.',
+    },
+    {
+      name: 'qa-characters',
+      label: 'qa-characters',
+      description: 'Psychologie, relations, crédibilité des personnages.',
+    },
+    {
+      name: 'qa-consistency',
+      label: 'qa-consistency',
+      description: 'Cohérence factuelle : objets, chronologie, lore, arcs.',
     },
     {
       name: 'edit-ai-fr',
-      label: 'Langue FR',
-      description: 'Nettoyage artefacts IA + français.',
+      label: 'edit-ai-fr',
+      description: 'Nettoyage artefacts IA + corrections de français.',
     },
   ];
 
@@ -179,6 +194,8 @@ export class App implements OnInit {
       };
       // Clear any suggestions from the previous document.
       this.pendingPatches = [];
+      // Ouvrir / rafraîchir le bureau d'analyse pour ce document.
+      this.openAnalysisDesk();
     } catch (error) {
       // Future: afficher un toast / message d’erreur.
       console.error('Failed to open document', error);
@@ -212,6 +229,88 @@ export class App implements OnInit {
         return;
       }
 
+      if (this.selectedSkillName === 'qa-originality') {
+        this.lastDiagnosticMessage =
+          "Originalité (/qa-originality) peut analyser la singularité créative de ton texte.\n\n" +
+          "- Voix : personnalité de la narration, ton, point de vue.\n" +
+          "- Clichés : formulations attendues, images vues et revues.\n" +
+          "- Idées : concept de la scène / nouvelle par rapport à des tropes connus.\n\n" +
+          "Dans le champ ci-dessous, précise ce que tu veux :\n" +
+          'Exemples :\n' +
+          '- \"Dis-moi si cette scène d’ouverture ressemble trop à un trope connu.\"\n' +
+          '- \"Analyse la voix de Julia : est-elle assez singulière ?\"\n' +
+          '- \"Repère les endroits où je retombe dans des clichés de thriller érotique.\"';
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
+      if (this.selectedSkillName === 'qa-prose') {
+        this.lastDiagnosticMessage =
+          "QA prose (/qa-prose) peut analyser la qualité de la phrase et du paragraphe.\n\n" +
+          "- POV : cohérence du point de vue, distance au personnage.\n" +
+          "- Show vs tell : là où tu expliques au lieu de faire vivre.\n" +
+          "- Description : clarté sensorielle, surcharge, clichés.\n" +
+          "- Dialogue : naturel, sous-texte, rythme.\n\n" +
+          "Dans le champ ci-dessous, précise ce que tu veux :\n" +
+          'Exemples :\n' +
+          '- \"Analyse uniquement les dialogues de cette scène.\"\n' +
+          '- \"Montre-moi où je suis trop explicatif / en mode tell.\"\n' +
+          '- \"Repère les phrases les plus lourdes et propose des pistes d’allègement.\"';
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
+      if (this.selectedSkillName === 'qa-characters') {
+        this.lastDiagnosticMessage =
+          "Personnages (/qa-characters) analyse la crédibilité et la cohérence psychologique des personnages.\n\n" +
+          "- Psychologie : motivations, arcs émotionnels, vraisemblance.\n" +
+          "- Relations : dynamiques interpersonnelles, chimie, conflits.\n" +
+          "- Crédibilité : réactions plausibles, cohérence des choix.\n\n" +
+          "Dans le champ ci-dessous, précise ce que tu veux :\n" +
+          "Exemples :\n" +
+          '- "Analyse Julia : ses motivations sont-elles claires ?"\n' +
+          '- "Est-ce que la relation avec l\'inconnu sonne vraie ?"\n' +
+          '- "Repère les moments où les personnages agissent de façon peu crédible."';
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
+      if (this.selectedSkillName === 'qa-consistency') {
+        this.lastDiagnosticMessage =
+          "Cohérence (/qa-consistency) vérifie la continuité factuelle du récit.\n\n" +
+          "- Objets : présence, localisation, usage cohérent.\n" +
+          "- Chronologie : ordre des événements, ellipses, contradictions.\n" +
+          "- Lore / univers : règles établies, cohérence interne.\n" +
+          "- Arcs narratifs : promesses tenues ou oubliées.\n\n" +
+          "Dans le champ ci-dessous, précise ce que tu veux :\n" +
+          "Exemples :\n" +
+          '- "Vérifie la chronologie de la scène 1 à 3."\n' +
+          '- "Y a-t-il des incohérences sur le carton noir ou les lieux ?"\n' +
+          '- "Repère les détails qui ne collent pas avec ce qui a été établi."';
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
+      if (this.selectedSkillName === 'edit-ai-fr') {
+        this.lastDiagnosticMessage =
+          "Langue FR (/edit-ai-fr) peut proposer des corrections détaillées de la langue et nettoyer les artefacts IA.\n\n" +
+          "- Orthographe, grammaire, accords.\n" +
+          "- Lourdeurs de phrase et répétitions mécaniques.\n" +
+          "- Tics de langage IA et formulations trop génériques.\n\n" +
+          "Dans le champ ci-dessous, précise ce que tu veux :\n" +
+          'Exemples :\n' +
+          '- \"Nettoie toute la scène mais garde mon style.\"\\n' +
+          '- \"Corrige surtout les dialogues.\"\\n' +
+          '- \"Propose seulement des corrections là où le français est vraiment bancal.\"';
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
       // Pour les autres skills, on reste sur le mock Tauri qui renvoie un patch.
       const run = await invoke<SkillRunModel>('run_skill_mock', {
         skillName: this.selectedSkillName,
@@ -236,9 +335,26 @@ export class App implements OnInit {
     this.cdr.detectChanges();
   }
 
+  onDiagnosticsKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendDiagnosticFollowup();
+    }
+  }
+
   async sendDiagnosticFollowup(): Promise<void> {
     const text = this.diagnosticFollowupText.trim();
-    if (!text || !this.currentDocument.path || this.selectedSkillName !== 'qa-reader') {
+    if (!text || !this.currentDocument.path || !this.selectedSkillName) {
+      return;
+    }
+    if (
+      this.selectedSkillName !== 'qa-reader' &&
+      this.selectedSkillName !== 'qa-originality' &&
+      this.selectedSkillName !== 'qa-prose' &&
+      this.selectedSkillName !== 'qa-characters' &&
+      this.selectedSkillName !== 'qa-consistency' &&
+      this.selectedSkillName !== 'edit-ai-fr'
+    ) {
       return;
     }
     try {
@@ -251,13 +367,17 @@ export class App implements OnInit {
         // pas besoin de renvoyer le message précédent en contexte pour le premier vrai run.
         previousMessage: null,
       });
-      console.log('qa-reader run completed, emitting skill-run event', {
+      console.log('skill run completed, emitting skill-run event', {
         path: this.currentDocument.path,
         skill: this.selectedSkillName,
         diagnosticsCount: run.diagnostics?.length ?? 0,
       });
       const first = run.diagnostics?.[0];
       this.lastDiagnosticMessage = first?.message ?? null;
+      // Si edit-ai-fr renvoie des patches, les ajouter aux suggestions inline.
+      if (this.selectedSkillName === 'edit-ai-fr' && run.patches?.length) {
+        this.pendingPatches = [...this.pendingPatches, ...run.patches];
+      }
       this.diagnosticFollowupText = '';
       // Diffuser le SkillRun complet vers la fenêtre d'analyse (si ouverte).
       emit('skill-run', {

@@ -122,15 +122,55 @@ These colors are used for tags, badges, run history markers, and section heading
 
 ## 5. Data & Components (Frontend)
 
-High-level Angular component ideas (names tentative):
+### 5.1. Implémentation actuelle
 
-- `AnalysisShellComponent` (window root)
-  - Owns:
-    - `activeDocumentPath`
-    - `activeSkillFamily`
-    - `selectedRun: SkillRunModel | null`
-    - `runsByDocumentAndSkill: Map<(doc, skill), SkillRunModel[]>`
-  - Listens to Tauri events for new `SkillRun`s.
+- `AnalysisShellComponent` (window root, **déjà implémenté**) :
+  - State réel :
+    - `activeDocumentPath: string | null`
+    - `activeSkillName: SkillName | null`
+    - `activeRun: SkillRunModel | null`
+    - `runsByKey: Record<string, SkillRunModel[]>` où la clé = `documentPath::skillName`
+    - `activeIndex: number` (index du run sélectionné pour le skill actif)
+    - `openSkills: SkillName[]` (liste des skills ayant un onglet ouvert pour le document courant)
+  - Intégration Tauri :
+    - Écoute `analysis-init` :
+      - Reçoit `{ documentPath }` depuis la fenêtre principale.
+      - Charge l’historique pour tous les skills supportés (`qa-reader`, `qa-originality`, `qa-prose`, `edit-ai-fr`) depuis `.analysis-history/`.
+      - Initialise `openSkills` uniquement avec les skills ayant de l’historique.
+      - Choisit un skill actif par défaut (ordre : `qa-reader` → `qa-originality` → `qa-prose` → `edit-ai-fr`) et sélectionne le run le plus récent.
+    - Écoute `skill-run` :
+      - Ajoute le `SkillRunModel` à `runsByKey` pour la paire `(documentPath, skillName)`.
+      - Ajoute le skill aux `openSkills` si besoin.
+      - Sauvegarde immédiatement la nouvelle liste de runs sur disque via `save_skill_run_history`.
+  - Techniques Angular :
+    - Utilise `NgZone` + `ChangeDetectorRef` pour garantir que les mises à jour venant de Tauri rafraîchissent bien l’UI.
+
+- Tabs par skill (Chrome-like) :
+  - UI implémentée dans le template d’`AnalysisShellComponent` :
+    - `openSkills` → liste d’onglets dynamiques (`qa-reader`, `qa-originality`, `qa-prose`, `edit-ai-fr`).
+    - Un onglet n’apparaît que s’il existe de l’historique pour ce skill **ou** après un premier run.
+    - Un bouton de fermeture par onglet permet de retirer un skill de `openSkills` (changement automatique de l’onglet actif si nécessaire).
+  - Style :
+    - Inspiré des onglets de navigateur (coins arrondis, onglet actif surélevé, bouton de fermeture discret).
+
+- Run history (colonne gauche) :
+  - Liste les `currentRuns` = historique du skill actif pour `activeDocumentPath`.
+  - Met en avant le run sélectionné (`activeIndex`).
+  - `selectRun(index)` change simplement `activeRun` et `activeIndex`.
+
+- Report reader (zone centrale) :
+  - Affiche `activeRun.diagnostics[0].message` comme corps principal du rapport (rapport “éditorial”).
+  - Pour `edit-ai-fr`, ce message inclut également un bloc listant les suggestions détectées sous forme :
+    - `ORIGINAL / REPLACEMENT / EXPLANATION` (données issues du JSON structuré renvoyé par Gemini, et réinjectées par le backend).
+
+- Persistance :
+  - `load_skill_run_history(documentPath, skillName)` et `save_skill_run_history(documentPath, skillName, runs[])` exposés par Tauri.
+  - Fichiers stockés dans `writer-app/.analysis-history/` (ignorés par Git).
+  - Au lancement de la fenêtre d’analyse, l’état en mémoire est reconstruit depuis ces fichiers.
+
+### 5.2. Composants prévus / à affiner
+
+High-level Angular component ideas (names still tentative, certains aspects déjà présents dans `AnalysisShellComponent`) :
 
 - `SkillRailComponent`
   - Props: `families`, `activeFamily`.

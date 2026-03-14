@@ -10,6 +10,11 @@ use uuid::Uuid;
 // On remonte donc de deux niveaux pour arriver à ai-blank-ink/
 const WORKSPACE_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
+/// Normalise les fins de lignes en LF (`\n`) pour rester aligné avec CodeMirror.
+fn normalize_newlines(input: &str) -> String {
+  input.replace("\r\n", "\n")
+}
+
 fn resolve_path(p: &str) -> PathBuf {
   let candidate = Path::new(p);
   if candidate.is_absolute() {
@@ -70,23 +75,48 @@ struct SkillRunDto {
   patches: Vec<PatchDto>,
 }
 
-fn load_skill_system_prompt(skill_name: &str) -> Result<String, String> {
-  // Chemin attendu : deps/ai-write-ink/skills/<skill_name>/SKILL.md
-  let skills_root = PathBuf::from(WORKSPACE_ROOT)
+fn load_skill_bundle(skill_name: &str) -> Result<String, String> {
+  // Dossier du skill : deps/ai-write-ink/skills/<skill_name>/
+  let skill_dir = PathBuf::from(WORKSPACE_ROOT)
     .join("deps")
     .join("ai-write-ink")
     .join("skills")
-    .join(skill_name)
-    .join("SKILL.md");
+    .join(skill_name);
 
-  std::fs::read_to_string(&skills_root).map_err(|e| {
-    format!(
-      "Failed to read SKILL.md for {} at {}: {}",
-      skill_name,
-      skills_root.display(),
-      e
-    )
-  })
+  let skill_md = skill_dir.join("SKILL.md");
+  let agent_md = skill_dir.join(format!("agent-{}.md", skill_name));
+
+  let mut bundle = String::new();
+
+  // SKILL.md est obligatoire
+  match std::fs::read_to_string(&skill_md) {
+    Ok(s) => {
+      bundle.push_str(&s);
+      bundle.push_str("\n\n---\n\n");
+    }
+    Err(e) => {
+      return Err(format!(
+        "Failed to read SKILL.md for {} at {}: {}",
+        skill_name,
+        skill_md.display(),
+        e
+      ))
+    }
+  }
+
+  // agent-<skill>.md est optionnel mais fortement recommandé
+  if let Ok(agent) = std::fs::read_to_string(&agent_md) {
+    bundle.push_str("# Agent instructions\n\n");
+    bundle.push_str(&agent);
+    bundle.push('\n');
+  } else {
+    bundle.push_str(&format!(
+      "_Warning: agent file {} not found; using SKILL.md only._\n",
+      agent_md.display()
+    ));
+  }
+
+  Ok(bundle)
 }
 
 #[derive(serde::Serialize)]
@@ -182,7 +212,9 @@ fn list_stories_tree() -> Vec<DocumentNodeDto> {
 #[tauri::command]
 fn open_document(path: String) -> Result<String, String> {
   let full = resolve_path(&path);
-  std::fs::read_to_string(&full).map_err(|e| e.to_string())
+  std::fs::read_to_string(&full)
+    .map(|s| normalize_newlines(&s))
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -297,6 +329,30 @@ struct GeminiPartResponse {
   text: String,
 }
 
+#[derive(serde::Deserialize)]
+struct EditAiSuggestionItem {
+  #[serde(default)]
+  id: Option<String>,
+  #[serde(default)]
+  axis: Option<String>,
+  #[serde(default)]
+  note: Option<String>,
+  #[serde(default)]
+  diagnostic: Option<String>,
+  original: String,
+  replacement: String,
+  #[serde(default)]
+  severity: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct EditAiSuggestionJson {
+  #[serde(default)]
+  diagnostics: Vec<DiagnosticDto>,
+  #[serde(default)]
+  suggestions: Vec<EditAiSuggestionItem>,
+}
+
 #[tauri::command]
 async fn run_skill(
   skill_name: String,
@@ -305,10 +361,16 @@ async fn run_skill(
   follow_up: Option<String>,
   previous_message: Option<String>,
 ) -> Result<SkillRunDto, String> {
-  // Pour l’instant on ne supporte que qa-reader en vrai appel modèle.
-  if skill_name != "qa-reader" {
-    return Err("run_skill currently only supports qa-reader; use run_skill_mock for others."
-      .to_string());
+  // Pour l’instant on ne supporte que qa-reader, qa-originality, qa-prose et edit-ai-fr en vrai appel modèle.
+  match skill_name.as_str() {
+    "qa-reader" | "qa-originality" | "qa-prose" | "qa-characters" | "qa-consistency" | "edit-ai-fr" => {
+    }
+    _ => {
+      return Err(
+        "run_skill supports qa-reader, qa-originality, qa-prose, qa-characters, qa-consistency, edit-ai-fr; use run_skill_mock for others."
+          .to_string(),
+      )
+    }
   }
 
   // Clé Gemini (Google AI for Developers)
@@ -319,11 +381,33 @@ async fn run_skill(
     .unwrap_or_else(|_| "gemini-2.5-flash-lite".to_string());
 
   let full = resolve_path(&path);
-  let content =
-    std::fs::read_to_string(&full).map_err(|e| format!("Failed to read document: {}", e))?;
+  let raw_content = std::fs::read_to_string(&full)
+    .map_err(|e| format!("Failed to read document: {}", e))?;
+  // IMPORTANT : on normalise les fins de lignes pour rester aligné avec CodeMirror.
+  let content = normalize_newlines(&raw_content);
 
-  // Charger le vrai SKILL.md de qa-reader comme instructions système.
-  let skill_instructions = load_skill_system_prompt(&skill_name)?;
+  // Charger le bundle SKILL.md + agent-<skill>.md comme instructions système.
+  let skill_instructions = load_skill_bundle(&skill_name)?;
+
+  let extra_constraints = match skill_name.as_str() {
+    "qa-reader" | "qa-originality" | "qa-prose" | "qa-characters" | "qa-consistency" => {
+      "IMPORTANT CONSTRAINTS:\n\
+- Never paste or quote the original story text in your answer.\n\
+- Do NOT include large excerpts from the input; refer to scenes/paragraphs descriptively.\n\
+- Output only your analysis and conclusions."
+    }
+    "edit-ai-fr" => "MANDATORY OUTPUT FORMAT:\n\
+1. You may start with a short prose summary (optional).\n\
+2. You MUST end your entire response with exactly ONE code block: ```json ... ```\n\
+3. Inside that single json block, output a single object with this exact structure:\n\
+   { \"suggestions\": [ { \"diagnostic\": \"brief explanation of WHY the change is needed\", \"original\": \"exact phrase from the text to replace\", \"replacement\": \"corrected phrase\" } ] }\n\
+4. \"diagnostic\" must always be filled with a short explanation (reason for the change).\n\
+5. \"original\" must be an exact substring copied from the input text (so the app can find and highlight it).\n\
+6. \"replacement\" is the corrected French text.\n\
+7. Add as many suggestion objects as needed. If no concrete edits, use \"suggestions\": [].\n\
+8. Do not put any other ```json or ``` blocks elsewhere. Only one ```json block at the very end.\n",
+    _ => "",
+  };
 
   let system_instruction = GeminiContent {
     role: "user".to_string(),
@@ -331,11 +415,8 @@ async fn run_skill(
       text: format!(
         "You are the /{} skill from AI Write Ink.\n\
 Follow these instructions exactly.\n\
-IMPORTANT CONSTRAINTS:\n\
-- Never paste or quote the original story text in your answer.\n\
-- Do NOT include large excerpts from the input; refer to scenes/paragraphs descriptively.\n\
-- Output only your analysis and conclusions.\n\n{}",
-        skill_name, skill_instructions
+{}\n\n{}",
+        skill_name, extra_constraints, skill_instructions
       ),
     }],
   };
@@ -344,7 +425,17 @@ IMPORTANT CONSTRAINTS:\n\
 
   // Message utilisateur principal incluant toujours le texte complet.
   // En cas de follow-up, on précise l'instruction dans le même message.
-  let user_text = if let Some(fu) = &follow_up {
+  let user_text = if skill_name == "edit-ai-fr" {
+    let reminder = "Réponds puis termine OBLIGATOIREMENT par un seul bloc ```json contenant un objet {\"suggestions\": [...]} avec pour chaque entrée: \"diagnostic\", \"original\" (sous-chaîne exacte du texte), \"replacement\".";
+    if let Some(fu) = &follow_up {
+      format!(
+        "Texte à analyser :\n\n{}\n\nInstruction : {}\n\n{}\n",
+        content, fu, reminder
+      )
+    } else {
+      format!("Texte à analyser :\n\n{}\n\n{}\n", content, reminder)
+    }
+  } else if let Some(fu) = &follow_up {
     format!(
       "Texte à analyser :\n\n{}\n\nInstruction spécifique :\n{}\n",
       content, fu
@@ -405,14 +496,98 @@ IMPORTANT CONSTRAINTS:\n\
   let run_id = format!("run-{}", Uuid::new_v4());
   let mode_value = mode.unwrap_or_else(|| "analysis".to_string());
 
-  let diag = DiagnosticDto {
+  let mut diagnostics_vec: Vec<DiagnosticDto> = Vec::new();
+  let mut patches: Vec<PatchDto> = Vec::new();
+
+  // Si edit-ai-fr, essayer d'extraire un bloc ```json ... ``` de la réponse
+  if skill_name == "edit-ai-fr" {
+    let json_marker = "```json";
+    let json_marker_alt = "```\njson"; // variante possible
+    let start = diagnostic_text
+      .find(json_marker)
+      .or_else(|| diagnostic_text.find(json_marker_alt));
+    if let Some(start) = start {
+      let skip = if diagnostic_text[start..].starts_with(json_marker) {
+        json_marker.len()
+      } else {
+        json_marker_alt.len()
+      };
+      if let Some(rel_end) = diagnostic_text[start + skip..].find("```") {
+        let json_start = start + skip;
+        let json_end = json_start + rel_end;
+        let json_str = diagnostic_text[json_start..json_end].trim();
+        if let Ok(env) = serde_json::from_str::<EditAiSuggestionJson>(json_str) {
+          // diagnostics éventuels renvoyés par le JSON
+          diagnostics_vec.extend(env.diagnostics.into_iter());
+
+          // suggestions -> patches inline
+          let mut debug_lines: Vec<String> = Vec::new();
+          for item in env.suggestions {
+            if item.original.is_empty() {
+              continue;
+            }
+            // Conserver une trace lisible dans le rapport pour aider au debug
+            let explanation = item
+              .diagnostic
+              .clone()
+              .or(item.note.clone())
+              .unwrap_or_else(|| "".to_string());
+            debug_lines.push(format!(
+              "- ORIGINAL: \"{}\"\n  REPLACEMENT: \"{}\"\n  EXPLANATION: {}",
+              item.original, item.replacement, explanation
+            ));
+
+            if let Some(pos) = content.find(&item.original) {
+              let from = pos;
+              let to = pos + item.original.len();
+              let patch_id =
+                item.id.unwrap_or_else(|| format!("edit-{}", Uuid::new_v4()));
+              patches.push(PatchDto {
+                id: patch_id,
+                skill_run_id: run_id.clone(),
+                start_offset: from,
+                end_offset: to,
+                before_text: item.original.clone(),
+                after_text: item.replacement,
+                status: "pending".to_string(),
+                axis: item.axis.unwrap_or_else(|| "edit-ai-fr".to_string()),
+                note: item.note.or(item.diagnostic),
+              });
+            }
+          }
+
+          if !debug_lines.is_empty() {
+            diagnostic_text.push_str(
+              "\n\n---\nSuggestions détectées (mapping original → replacement):\n",
+            );
+            diagnostic_text.push_str(&debug_lines.join("\n"));
+          }
+        }
+        // Retirer le bloc JSON du texte de diagnostic pour l'affichage
+        let remove_end = json_end + 3; // inclure les ```
+        diagnostic_text.replace_range(start..remove_end, "");
+      }
+    } else if !diagnostic_text.is_empty() {
+      // Pas de bloc JSON trouvé : informer l'utilisateur
+      diagnostic_text.push_str("\n\n---\n*Aucun bloc JSON de suggestions n'a été retourné ; les corrections inline ne sont pas disponibles. Réessayez ou reformulez pour demander des corrections concrètes avec le format attendu.*");
+    }
+  }
+
+  // Diagnostic "rapport" principal
+  let summary_diag = DiagnosticDto {
     id: format!("diag-{}", Uuid::new_v4()),
-    axis: "qa-reader:report".to_string(),
+    axis: format!("{}:report", skill_name),
     message: diagnostic_text,
     severity: "info".to_string(),
     start_offset: None,
     end_offset: None,
   };
+
+  if diagnostics_vec.is_empty() {
+    diagnostics_vec.push(summary_diag);
+  } else {
+    diagnostics_vec.insert(0, summary_diag);
+  }
 
   let run = SkillRunDto {
     id: run_id,
@@ -421,8 +596,8 @@ IMPORTANT CONSTRAINTS:\n\
     mode: mode_value,
     scope: "full".to_string(),
     created_at: Utc::now().to_rfc3339(),
-    diagnostics: vec![diag],
-    patches: Vec::new(),
+    diagnostics: diagnostics_vec,
+    patches,
   };
 
   Ok(run)

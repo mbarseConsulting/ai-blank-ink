@@ -99,26 +99,61 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
       this.zone.run(async () => {
         console.log('Analysis desk received analysis-init', { documentPath });
         this.activeDocumentPath = documentPath;
-        const defaultSkill: SkillName = 'qa-reader';
-        this.activeSkillName = defaultSkill;
-        const key = this.makeKey(documentPath, defaultSkill);
+        // Réinitialiser les onglets et l'état pour ce document uniquement.
+        this.openSkills = [];
+        const supportedSkills: SkillName[] = [
+          'qa-reader',
+          'qa-originality',
+          'qa-prose',
+          'qa-characters',
+          'qa-consistency',
+          'edit-ai-fr',
+        ];
 
-        try {
-          const existing = await invoke<SkillRunModel[]>('load_skill_run_history', {
-            path: documentPath,
-            skillName: defaultSkill,
-          });
-          this.runsByKey[key] = existing ?? [];
-          if (this.runsByKey[key].length > 0) {
-            if (!this.openSkills.includes(defaultSkill)) {
-              this.openSkills.push(defaultSkill);
+        for (const skill of supportedSkills) {
+          const key = this.makeKey(documentPath, skill);
+          try {
+            const existing = await invoke<SkillRunModel[]>('load_skill_run_history', {
+              path: documentPath,
+              skillName: skill,
+            });
+            const runs = existing ?? [];
+            this.runsByKey[key] = runs;
+            if (runs.length > 0) {
+              this.openSkills.push(skill);
             }
-            this.activeKey = key;
-            this.activeIndex = this.runsByKey[key].length - 1;
-            this.activeRun = this.runsByKey[key][this.activeIndex];
+          } catch (error) {
+            console.error('Failed to load history on analysis-init for', skill, error);
+            this.runsByKey[key] = [];
           }
-        } catch (error) {
-          console.error('Failed to load history on analysis-init', error);
+        }
+
+        // Choisir un skill actif : priorité à qa-reader, sinon le premier ayant un historique.
+        const defaultOrder: SkillName[] = [
+          'qa-reader',
+          'qa-originality',
+          'qa-prose',
+          'qa-characters',
+          'qa-consistency',
+          'edit-ai-fr',
+        ];
+        let chosen: SkillName | null = null;
+        for (const skill of defaultOrder) {
+          if (this.openSkills.includes(skill)) {
+            chosen = skill;
+            break;
+          }
+        }
+
+        if (chosen) {
+          this.activeSkillName = chosen;
+          const key = this.makeKey(documentPath, chosen);
+          this.setActiveFromKey(key);
+        } else {
+          this.activeSkillName = null;
+          this.activeKey = null;
+          this.activeIndex = 0;
+          this.activeRun = null;
         }
 
         this.cdr.detectChanges();

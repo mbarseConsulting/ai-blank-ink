@@ -4,6 +4,9 @@ export type SkillName =
   | 'write-ink'
   | 'qa-reader'
   | 'qa-originality'
+  | 'qa-prose'
+  | 'qa-characters'
+  | 'qa-consistency'
   | 'edit-ai-fr';
 
 export type PatchStatus = 'pending' | 'accepted' | 'rejected';

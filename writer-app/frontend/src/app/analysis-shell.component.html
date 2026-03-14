@@ -45,7 +45,7 @@
           (click)="selectRun(i)"
         >
           <span class="analysis-history-label">
-            Run {{ i + 1 }} – {{ run.createdAt | date: 'shortTime' }}
+            Run {{ i + 1 }} – {{ run.createdAt | date: 'dd/MM/yy' }} {{ run.createdAt | date: 'shortTime' }}
           </span>
         </li>
       </ul>
@@ -57,7 +57,7 @@
           Rapport {{ activeSkillName }}
         </h2>
         <pre class="analysis-report-body">
-{{ activeRun.diagnostics?.[0]?.message || 'Aucun message de diagnostic.' }}
+{{ activeRun.diagnostics[0]?.message || 'Aucun message de diagnostic.' }}
         </pre>
       </article>
     </div>
