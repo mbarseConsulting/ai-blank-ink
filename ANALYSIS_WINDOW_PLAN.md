@@ -1,5 +1,7 @@
 ## Ink Intelligence Desk – Second Window Plan
 
+**Référence configuration (id : `writer-app-config`)** — Valeurs en dur (titres fenêtre, skills, i18n, etc.) dans `writer-app/config.json`. Voir `writer-app/CONFIG.md`.
+
 This document describes the second desktop window dedicated to **analysis, reports, and structure**, complementary to the main “Writing Surface” window.
 
 ---

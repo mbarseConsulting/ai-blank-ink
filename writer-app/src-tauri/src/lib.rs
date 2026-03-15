@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use chrono::Utc;
+use once_cell::sync::OnceCell;
+use regex::Regex;
 use reqwest::Client;
 use tauri::Manager;
 use uuid::Uuid;
@@ -10,9 +12,110 @@ use uuid::Uuid;
 // On remonte donc de deux niveaux pour arriver à ai-blank-ink/
 const WORKSPACE_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
+// ---------- Config (writer-app/config.json) ----------
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppConfig {
+  paths: PathsConfig,
+  window: WindowConfig,
+  gemini: GeminiConfig,
+  skills: SkillsConfig,
+  ui: UiConfig,
+  i18n: I18nConfig,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PathsConfig {
+  stories_dir: String,
+  analysis_history_dir: String,
+  env_file: String,
+  skills_base_dir: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WindowConfig {
+  analysis_label: String,
+  analysis_title: String,
+  analysis_dev_url: String,
+  #[serde(default = "default_analysis_inner_size")]
+  analysis_inner_size: [f64; 2],
+}
+
+fn default_analysis_inner_size() -> [f64; 2] {
+  [1200.0, 800.0]
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GeminiConfig {
+  default_model: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SkillsConfig {
+  supported_for_run: Vec<String>,
+  supported_for_analysis_desk: Vec<String>,
+  default_order: Vec<String>,
+  list: Vec<SkillEntry>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SkillEntry {
+  name: String,
+  label: String,
+  description: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UiConfig {
+  analysis_init_delay_ms: u64,
+  skill_footer_max_height_percent: u32,
+  skill_footer_min_height_px: u32,
+  skill_footer_resize_max_percent_of_window: u32,
+  editor_min_height_px: u32,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct I18nConfig {
+  empty_tree_message: String,
+  analysis_desk_title: String,
+  analysis_history_title: String,
+  no_report_placeholder: String,
+  no_report_hint: String,
+  no_doc_subtitle: String,
+}
+
+fn load_app_config() -> Result<AppConfig, String> {
+  let path = PathBuf::from(WORKSPACE_ROOT).join("writer-app").join("config.json");
+  let data = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read config: {}", e))?;
+  serde_json::from_str(&data).map_err(|e| format!("Failed to parse config: {}", e))
+}
+
+static APP_CONFIG: OnceCell<AppConfig> = OnceCell::new();
+
+fn app_config() -> &'static AppConfig {
+  APP_CONFIG.get_or_init(|| {
+    load_app_config().unwrap_or_else(|e| {
+      panic!("writer-app/config.json required: {}", e);
+    })
+  })
+}
+
+/// Returns app config for the frontend (single source of truth: writer-app/config.json).
+#[tauri::command]
+fn get_app_config() -> Result<AppConfig, String> {
+  load_app_config()
+}
+
 /// Normalise les fins de lignes en LF (`\n`) pour rester aligné avec CodeMirror.
 fn normalize_newlines(input: &str) -> String {
-  input.replace("\r\n", "\n")
+  input.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn resolve_path(p: &str) -> PathBuf {
@@ -25,13 +128,67 @@ fn resolve_path(p: &str) -> PathBuf {
 }
 
 fn history_dir() -> PathBuf {
-  PathBuf::from(WORKSPACE_ROOT).join("writer-app").join(".analysis-history")
+  PathBuf::from(WORKSPACE_ROOT).join(&app_config().paths.analysis_history_dir)
 }
 
 fn history_file_for(path: &str, skill_name: &str) -> PathBuf {
   let mut slug = path.replace(['/', '\\'], "-");
   slug = slug.replace('.', "_");
   history_dir().join(format!("{}.{}.json", slug, skill_name))
+}
+
+/// Convert byte offsets (UTF-8) to character offsets for CodeMirror / JS (code points).
+/// French fiction (é, à, «, », —) and most BMP characters: 1 code point = 1 JS index.
+fn calculate_char_offsets(content: &str, byte_start: usize, byte_end: usize) -> (usize, usize) {
+  let char_start = content[..byte_start].chars().count();
+  let char_count = content[byte_start..byte_end].chars().count();
+  (char_start, char_start + char_count)
+}
+
+/// Cherche `original` dans `content` : d’abord correspondance exacte (après normalisation
+/// des fins de ligne), puis correspondance flexible où toute séquence de blancs (espace,
+/// saut de ligne) dans l’original peut matcher n’importe quelle séquence de blancs dans
+/// le document (ex. Gemini renvoie "yeux. —" alors que le doc a "yeux.\n—").
+/// Retourne (byte_start, byte_end, slice_matched) pour créer le patch avec le texte réel du doc.
+fn find_original_in_content(content: &str, original: &str) -> Option<(usize, usize, String)> {
+  let normalized = normalize_newlines(original);
+  // 1) Correspondance exacte (normalisée)
+  if let Some(byte_pos) = content.find(&normalized) {
+    let byte_end = byte_pos + normalized.len();
+    let matched = content[byte_pos..byte_end].to_string();
+    return Some((byte_pos, byte_end, matched));
+  }
+  // 2) Correspondance flexible : blancs → \s+
+  let pattern = build_flexible_whitespace_pattern(&normalized);
+  if let Ok(re) = Regex::new(&pattern) {
+    if let Some(m) = re.find(content) {
+      let (byte_start, byte_end) = (m.start(), m.end());
+      let matched = content[byte_start..byte_end].to_string();
+      return Some((byte_start, byte_end, matched));
+    }
+  }
+  None
+}
+
+/// Construit une regex où chaque séquence de caractères blancs est remplacée par \s+.
+fn build_flexible_whitespace_pattern(normalized: &str) -> String {
+  let mut out = String::new();
+  let mut run = String::new();
+  for c in normalized.chars() {
+    if c.is_whitespace() {
+      if !run.is_empty() {
+        out.push_str(&regex::escape(&run));
+        run.clear();
+      }
+      out.push_str("\\s+");
+    } else {
+      run.push(c);
+    }
+  }
+  if !run.is_empty() {
+    out.push_str(&regex::escape(&run));
+  }
+  out
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -76,11 +233,8 @@ struct SkillRunDto {
 }
 
 fn load_skill_bundle(skill_name: &str) -> Result<String, String> {
-  // Dossier du skill : deps/ai-write-ink/skills/<skill_name>/
   let skill_dir = PathBuf::from(WORKSPACE_ROOT)
-    .join("deps")
-    .join("ai-write-ink")
-    .join("skills")
+    .join(&app_config().paths.skills_base_dir)
     .join(skill_name);
 
   let skill_md = skill_dir.join("SKILL.md");
@@ -202,11 +356,13 @@ fn scan_stories_dir(base: &Path, rel_prefix: &str) -> Vec<DocumentNodeDto> {
 
 #[tauri::command]
 fn list_stories_tree() -> Vec<DocumentNodeDto> {
-  let root = PathBuf::from(WORKSPACE_ROOT).join("stories");
+  let cfg = app_config();
+  let root = PathBuf::from(WORKSPACE_ROOT).join(&cfg.paths.stories_dir);
   if !root.exists() || !root.is_dir() {
     return Vec::new();
   }
-  scan_stories_dir(&root, "stories/")
+  let prefix = format!("{}/", cfg.paths.stories_dir);
+  scan_stories_dir(&root, &prefix)
 }
 
 #[tauri::command]
@@ -226,9 +382,10 @@ fn save_document(path: String, content: String) -> Result<(), String> {
 /// Ouvre (ou affiche) la fenêtre d'analyse dédiée aux rapports de skills.
 /// Important: command async pour éviter le deadlock Webview2 sous Windows.
 #[tauri::command]
-async fn open_analysis_window(window: tauri::AppHandle, path: Option<String>) -> Result<(), String> {
-  // Essayer de récupérer une fenêtre existante.
-  if let Some(win) = window.get_webview_window("analysis") {
+async fn open_analysis_window(window: tauri::AppHandle, _path: Option<String>) -> Result<(), String> {
+  let cfg = app_config();
+  let label = &cfg.window.analysis_label;
+  if let Some(win) = window.get_webview_window(label) {
     if let Err(e) = win.show() {
       return Err(e.to_string());
     }
@@ -236,21 +393,20 @@ async fn open_analysis_window(window: tauri::AppHandle, path: Option<String>) ->
       return Err(e.to_string());
     }
   } else {
-    // Créer une nouvelle fenêtre pointant vers la même app mais avec un hash #analysis.
-    // En dev, on pointe explicitement sur le devUrl avec #analysis pour éviter les soucis de chemin.
     #[cfg(debug_assertions)]
     let url = tauri::WebviewUrl::External(
-      "http://localhost:4200/#analysis"
+      cfg.window.analysis_dev_url
         .parse()
-        .expect("invalid dev URL for analysis window"),
+        .map_err(|_| "invalid analysisDevUrl in config")?,
     );
 
     #[cfg(not(debug_assertions))]
     let url = tauri::WebviewUrl::App("index.html#analysis".into());
 
-    tauri::WebviewWindowBuilder::new(&window, "analysis", url)
-    .title("Ghost Writer – Analysis Desk")
-    .inner_size(1200.0, 800.0)
+    let [w, h] = cfg.window.analysis_inner_size;
+    tauri::WebviewWindowBuilder::new(&window, label, url)
+    .title(&cfg.window.analysis_title)
+    .inner_size(w, h)
     .resizable(true)
     .build()
     .map_err(|e| e.to_string())?;
@@ -342,6 +498,7 @@ struct EditAiSuggestionItem {
   original: String,
   replacement: String,
   #[serde(default)]
+  #[allow(dead_code)]
   severity: Option<String>,
 }
 
@@ -362,32 +519,21 @@ async fn run_skill(
   previous_message: Option<String>,
 ) -> Result<SkillRunDto, String> {
   // Pour l’instant on ne supporte que qa-reader, qa-originality, qa-prose et edit-ai-fr en vrai appel modèle.
-  match skill_name.as_str() {
-    "qa-reader"
-    | "qa-originality"
-    | "qa-prose"
-    | "qa-characters"
-    | "qa-consistency"
-    | "write-ink"
-    | "cowrite-ink"
-    | "edit-ai-fr" => {}
-    _ => {
-      return Err(
-        "run_skill supports qa-reader, qa-originality, qa-prose, qa-characters, qa-consistency, write-ink, cowrite-ink, edit-ai-fr; use run_skill_mock for others."
-          .to_string(),
-      )
-    }
+  let cfg = app_config();
+  if !cfg.skills.supported_for_run.iter().any(|s| s.as_str() == skill_name.as_str()) {
+    return Err(format!(
+      "run_skill supports: {}.",
+      cfg.skills.supported_for_run.join(", ")
+    ));
   }
 
-  // Clé Gemini : env var ou fichier writer-app/.env (non committé)
-  let env_path = PathBuf::from(WORKSPACE_ROOT).join("writer-app").join(".env");
+  let env_path = PathBuf::from(WORKSPACE_ROOT).join(&cfg.paths.env_file);
   let _ = dotenvy::from_path(&env_path);
 
   let api_key =
-    std::env::var("GEMINI_API_KEY").map_err(|_| "GEMINI_API_KEY is not set (add it to writer-app/.env)".to_string())?;
-  // Default to a current Gemini model; can be overridden via GEMINI_MODEL env var.
+    std::env::var("GEMINI_API_KEY").map_err(|_| format!("GEMINI_API_KEY is not set (add it to {})", cfg.paths.env_file))?;
   let model = std::env::var("GEMINI_MODEL")
-    .unwrap_or_else(|_| "gemini-2.5-flash-lite".to_string());
+    .unwrap_or_else(|_| cfg.gemini.default_model.clone());
 
   let full = resolve_path(&path);
   let raw_content = std::fs::read_to_string(&full)
@@ -555,17 +701,19 @@ Follow these instructions exactly.\n\
               item.original, item.replacement, explanation
             ));
 
-            if let Some(pos) = content.find(&item.original) {
-              let from = pos;
-              let to = pos + item.original.len();
+            if let Some((byte_pos, byte_end, matched_slice)) =
+              find_original_in_content(&content, &item.original)
+            {
+              let (char_from, char_to) =
+                calculate_char_offsets(&content, byte_pos, byte_end);
               let patch_id =
                 item.id.unwrap_or_else(|| format!("edit-{}", Uuid::new_v4()));
               patches.push(PatchDto {
                 id: patch_id,
                 skill_run_id: run_id.clone(),
-                start_offset: from,
-                end_offset: to,
-                before_text: item.original.clone(),
+                start_offset: char_from,
+                end_offset: char_to,
+                before_text: matched_slice,
                 after_text: item.replacement,
                 status: "pending".to_string(),
                 axis: item.axis.unwrap_or_else(|| "edit-ai-fr".to_string()),
@@ -621,58 +769,6 @@ Follow these instructions exactly.\n\
   Ok(run)
 }
 
-/// Première implémentation très simple d'un "runner" de skill côté Tauri.
-/// Pour l'instant, c'est un mock : on lit le document et on fabrique un SkillRunDto
-/// avec un diagnostic et un patch basique sur les premiers caractères.
-#[tauri::command]
-fn run_skill_mock(skill_name: String, path: String, mode: Option<String>) -> Result<SkillRunDto, String> {
-  let full = resolve_path(&path);
-  let content = std::fs::read_to_string(&full).map_err(|e| e.to_string())?;
-
-  let run_id = format!("run-{}", Uuid::new_v4());
-  let mode_value = mode.unwrap_or_else(|| "analysis".to_string());
-
-  // Diagnostic très simple sur le début du texte.
-  let diag = DiagnosticDto {
-    id: format!("diag-{}", Uuid::new_v4()),
-    axis: format!("{}:mock", skill_name),
-    message: "Mock diagnostic: début du texte analysé.".to_string(),
-    severity: "info".to_string(),
-    start_offset: Some(0),
-    end_offset: Some(content.len().min(80)),
-  };
-
-  // Patch très simple : duplique les 80 premiers caractères avec un marqueur [MOCK].
-  let end = content.len().min(80);
-  let before = content.chars().take(end).collect::<String>();
-  let after = format!("{} [MOCK]", before);
-
-  let patch = PatchDto {
-    id: format!("patch-{}", Uuid::new_v4()),
-    skill_run_id: run_id.clone(),
-    start_offset: 0,
-    end_offset: end,
-    before_text: before,
-    after_text: after,
-    status: "pending".to_string(),
-    axis: format!("{}:mock", skill_name),
-    note: Some("Patch mock généré côté Tauri pour tester le flux.".to_string()),
-  };
-
-  let run = SkillRunDto {
-    id: run_id,
-    document_id: path,
-    skill_name,
-    mode: mode_value,
-    scope: "full".to_string(),
-    created_at: chrono::Utc::now().to_rfc3339(),
-    diagnostics: vec![diag],
-    patches: vec![patch],
-  };
-
-  Ok(run)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -687,13 +783,13 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
+      get_app_config,
       list_stories_tree,
       open_document,
       save_document,
       open_analysis_window,
       load_skill_run_history,
       save_skill_run_history,
-      run_skill_mock,
       run_skill
     ])
     .run(tauri::generate_context!())

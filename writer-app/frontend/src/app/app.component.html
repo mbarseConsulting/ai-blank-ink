@@ -28,7 +28,7 @@
     </ul>
 
     <div class="sidebar-hint" *ngIf="!documentTree.length">
-      Aucun projet dans stories/
+      {{ emptyTreeMessage }}
     </div>
 
     <ng-template #renderNode let-node let-level="level">
@@ -57,7 +57,7 @@
 
   <!-- Centre : éditeur + barre de conversation skill -->
   <div class="editor-area">
-    <div class="editor-main" *ngIf="currentDocument">
+    <div class="editor-main" *ngIf="currentDocument" [style.min-height.px]="editorMinHeightPx">
       <app-document-editor
         #documentEditor
         [document]="currentDocument"
@@ -73,7 +73,7 @@
       class="skill-footer"
       *ngIf="selectedSkillName"
       [style.height.px]="skillFooterHeightPx ?? undefined"
-      [style.max-height]="skillFooterHeightPx == null ? '33%' : 'none'"
+      [style.max-height]="skillFooterHeightPx == null ? (skillFooterMaxHeightPercent + '%') : 'none'"
     >
       <div class="skill-footer-response" *ngIf="lastDiagnosticMessage">
         <div class="skill-footer-body" [innerHTML]="renderedDiagnosticHtml"></div>

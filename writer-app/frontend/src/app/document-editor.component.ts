@@ -21,7 +21,7 @@ import {
   WidgetType,
 } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
-import { DocumentModel, PatchModel, SkillName } from './models';
+import { DocumentModel, PatchModel } from './models';
 
 @Component({
   selector: 'app-document-editor',
@@ -136,96 +136,6 @@ export class DocumentEditorComponent
     this.rejectPatch.emit(patch);
   }
 
-  /**
-   * Create a mock PatchModel by finding the exact Elle…Permettez. block
-   * in the current CodeMirror document. Returns null if not found.
-   */
-  createMockPatch(skillName: SkillName): PatchModel | null {
-    if (!this.view) return null;
-
-    const doc = this.view.state.doc;
-    const content = doc.toString();
-
-    // Regex over the flat string, tolerant to line breaks
-    const pattern = /Elle tendit la main vers[\s\S]*?— Permettez\.(?=\s|$)/m;
-    const match = pattern.exec(content);
-
-    if (!match || match.index === undefined) {
-      console.warn('Mock patch: target Elle…Permettez. excerpt not found in current document.');
-      return null;
-    }
-
-    const startIndex = match.index;
-    const matchedText = match[0];
-    const endIndex = startIndex + matchedText.length;
-
-    // Validate against CodeMirror's Text model to avoid off-by-one surprises
-    const checkText = doc.sliceString(startIndex, endIndex);
-    if (checkText !== matchedText) {
-      console.warn('Mock patch: CM6 slice != regex match, refusing to create patch.');
-      return null;
-    }
-
-    const id = `patch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    const patch: PatchModel = {
-      id,
-      skillRunId: `run-${Date.now()}`,
-      startOffset: startIndex,
-      endOffset: endIndex,
-      beforeText: matchedText,
-      // Keep the block identical, just append a small marker so we see it was applied
-      afterText: matchedText + ' [TEST]',
-      status: 'pending',
-      axis: `${skillName}:mock`,
-      note: 'Mock QA suggestion on the “Elle…Permettez.” paragraph.',
-    };
-
-    return patch;
-  }
-
-  /**
-   * Create a couple of mock patches for the qa-originality skill,
-   * on arbitrary excerpts, to test multiple suggestions in the UI.
-   */
-  createMockOriginalityPatches(): PatchModel[] {
-    if (!this.view) return [];
-    const doc = this.view.state.doc;
-    const content = doc.toString();
-
-    const snippets = [
-      "Les rayonnages montaient haut, nimbés d'une poussière grise qui figait le temps.",
-      "Elle regarda autour d'elle : les rayonnages immobiles, la poussière en suspension...",
-    ];
-
-    const patches: PatchModel[] = [];
-
-    for (const snippet of snippets) {
-      const idx = content.indexOf(snippet);
-      if (idx === -1) continue;
-
-      const start = idx;
-      const end = idx + snippet.length;
-      const cmSlice = doc.sliceString(start, end);
-      if (cmSlice !== snippet) continue;
-
-      const id = `orig-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      patches.push({
-        id,
-        skillRunId: `run-${Date.now()}`,
-        startOffset: start,
-        endOffset: end,
-        beforeText: snippet,
-        afterText: snippet + ' [TEST]',
-        status: 'pending',
-        axis: 'qa-originality:mock',
-        note: 'Mock originality suggestion for testing multiple patches.',
-      });
-    }
-
-    return patches;
-  }
-
   private createEditorState(doc: string): EditorState {
     const proseTheme = EditorView.theme(
       {
@@ -246,7 +156,7 @@ export class DocumentEditorComponent
       { dark: true }
     );
 
-    const patchDecorations = this.buildPatchDecorations();
+    const patchDecorations = this.buildPatchDecorations(doc);
 
     return EditorState.create({
       doc,
@@ -266,7 +176,7 @@ export class DocumentEditorComponent
     });
   }
 
-  private buildPatchDecorations() {
+  private buildPatchDecorations(doc: string): DecorationSet {
     const ranges: Range<Decoration>[] = [];
 
     for (const patch of this.patches ?? []) {
@@ -280,6 +190,14 @@ export class DocumentEditorComponent
         from < 0 ||
         to < from
       ) {
+        continue;
+      }
+
+      const currentTextAtRange = doc.slice(from, to);
+      if (currentTextAtRange !== patch.beforeText) {
+        console.warn(
+          `Patch ${patch.id} is stale or invalid: document text at range [${from},${to}] does not match beforeText. Skipping.`
+        );
         continue;
       }
 
@@ -367,4 +285,3 @@ class PatchSuggestionWidget extends WidgetType {
     return container;
   }
 }
-

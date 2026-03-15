@@ -11,6 +11,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { SkillRunModel, SkillName } from './models';
+import { AppConfigService } from './app-config.service';
 
 @Component({
   selector: 'app-analysis-shell',
@@ -23,6 +24,7 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
   private zone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
   private sanitizer = inject(DomSanitizer);
+  private configService = inject(AppConfigService);
 
   activeDocumentPath: string | null = null;
   activeSkillName: SkillName | null = null;
@@ -101,18 +103,8 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
       this.zone.run(async () => {
         console.log('Analysis desk received analysis-init', { documentPath });
         this.activeDocumentPath = documentPath;
-        // Réinitialiser les onglets et l'état pour ce document uniquement.
         this.openSkills = [];
-        const supportedSkills: SkillName[] = [
-          'qa-reader',
-          'qa-originality',
-          'qa-prose',
-          'qa-characters',
-          'qa-consistency',
-          'write-ink',
-          'cowrite-ink',
-          'edit-ai-fr',
-        ];
+        const supportedSkills = this.configService.get().skills.supportedForAnalysisDesk as SkillName[];
 
         for (const skill of supportedSkills) {
           const key = this.makeKey(documentPath, skill);
@@ -132,17 +124,7 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
           }
         }
 
-        // Choisir un skill actif : priorité à qa-reader, sinon le premier ayant un historique.
-        const defaultOrder: SkillName[] = [
-          'qa-reader',
-          'qa-originality',
-          'qa-prose',
-          'qa-characters',
-          'qa-consistency',
-          'write-ink',
-          'cowrite-ink',
-          'edit-ai-fr',
-        ];
+        const defaultOrder = this.configService.get().skills.defaultOrder as SkillName[];
         let chosen: SkillName | null = null;
         for (const skill of defaultOrder) {
           if (this.openSkills.includes(skill)) {
@@ -219,6 +201,22 @@ export class AnalysisShellComponent implements OnInit, OnDestroy {
     }
     const key = this.makeKey(this.activeDocumentPath, this.activeSkillName);
     return this.runsByKey[key] ?? [];
+  }
+
+  get analysisDeskTitle(): string {
+    return this.configService.get().i18n.analysisDeskTitle;
+  }
+  get analysisHistoryTitle(): string {
+    return this.configService.get().i18n.analysisHistoryTitle;
+  }
+  get noReportPlaceholder(): string {
+    return this.configService.get().i18n.noReportPlaceholder;
+  }
+  get noReportHint(): string {
+    return this.configService.get().i18n.noReportHint;
+  }
+  get noDocSubtitle(): string {
+    return this.configService.get().i18n.noDocSubtitle;
   }
 
   selectRun(index: number): void {

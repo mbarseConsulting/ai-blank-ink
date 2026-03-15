@@ -6,8 +6,8 @@ directement sur les fichiers du projet (`stories/`, `deps/...`).
 
 ## Configuration
 
-- Clé API : `writer-app/.env` (non committé) avec `GEMINI_API_KEY=...`
-- Le backend charge cette clé via `dotenvy` pour les appels Gemini.
+- **Valeurs en dur :** toutes dans `writer-app/config.json` (chemins, fenêtres, skills, UI, i18n). Voir **[CONFIG.md](CONFIG.md)** (réf. `writer-app-config`) — ne pas réintroduire de chaînes ou constantes en dur dans le code.
+- **Clé API :** `writer-app/.env` (non committé) avec `GEMINI_API_KEY=...` ; chargée via `dotenvy` côté backend.
 
 ## Fonctionnalités récentes
 

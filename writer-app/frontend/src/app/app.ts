@@ -18,6 +18,7 @@ import {
   SkillName,
   SkillRunModel,
 } from './models';
+import { AppConfigService } from './app-config.service';
 import { DocumentEditorComponent } from './document-editor.component';
 import { SkillsPanelComponent } from './skills-panel.component';
 
@@ -36,6 +37,7 @@ import { SkillsPanelComponent } from './skills-panel.component';
 export class App implements OnInit {
   private cdr = inject(ChangeDetectorRef);
   private sanitizer = inject(DomSanitizer);
+  private configService = inject(AppConfigService);
 
   /** Arbre de documents, rempli par le scan Tauri de stories/. */
   documentTree: DocumentNode[] = [];
@@ -82,58 +84,9 @@ export class App implements OnInit {
     }
   }
 
-  availableSkills: { name: SkillName; label: string; description: string }[] = [
-    {
-      name: 'calibrate-ink',
-      label: 'calibrate-ink',
-      description: 'Fixer genre et conventions de lecture (calibration).',
-    },
-    {
-      name: 'write-ink',
-      label: 'write-ink',
-      description: 'Prose narrative : scènes, chapitres, continuations, réécritures ciblées.',
-    },
-    {
-      name: 'cowrite-ink',
-      label: 'cowrite-ink',
-      description: 'Directeur créatif : brainstorm, direction, critique sur demande.',
-    },
-    {
-      name: 'qa-prose',
-      label: 'qa-prose',
-      description: 'POV, show/tell, description, dialogue (ligne à ligne).',
-    },
-    {
-      name: 'arch-ink',
-      label: 'arch-ink',
-      description: 'Analyse structurelle (acts, arcs, climax).',
-    },
-    {
-      name: 'qa-reader',
-      label: 'qa-reader',
-      description: 'Hooks, tension, rythme, engagement (expérience de lecture).',
-    },
-    {
-      name: 'qa-originality',
-      label: 'qa-originality',
-      description: 'Clichés vs singularité de la voix et des idées.',
-    },
-    {
-      name: 'qa-characters',
-      label: 'qa-characters',
-      description: 'Psychologie, relations, crédibilité des personnages.',
-    },
-    {
-      name: 'qa-consistency',
-      label: 'qa-consistency',
-      description: 'Cohérence factuelle : objets, chronologie, lore, arcs.',
-    },
-    {
-      name: 'edit-ai-fr',
-      label: 'edit-ai-fr',
-      description: 'Nettoyage artefacts IA + corrections de français.',
-    },
-  ];
+  get availableSkills(): { name: SkillName; label: string; description: string }[] {
+    return this.configService.get().skills.list as { name: SkillName; label: string; description: string }[];
+  }
 
   currentDocument: DocumentModel = {
     id: 'untitled',
@@ -192,6 +145,18 @@ export class App implements OnInit {
     return this.availableSkills.find((s) => s.name === this.selectedSkillName) ?? null;
   }
 
+  get skillFooterMaxHeightPercent(): number {
+    return this.configService.get().ui.skillFooterMaxHeightPercent;
+  }
+
+  get emptyTreeMessage(): string {
+    return this.configService.get().i18n.emptyTreeMessage;
+  }
+
+  get editorMinHeightPx(): number {
+    return this.configService.get().ui.editorMinHeightPx;
+  }
+
   openAnalysisDesk(): void {
     if (!this.currentDocument.path) return;
     const currentPath = this.currentDocument.path;
@@ -204,7 +169,7 @@ export class App implements OnInit {
           emit('analysis-init', {
             documentPath: currentPath,
           }).catch((err) => console.error('Failed to emit analysis-init', err));
-        }, 800);
+        }, this.configService.get().ui.analysisInitDelayMs);
       })
       .catch((err) => console.error('Failed to open analysis window', err));
   }
@@ -384,23 +349,31 @@ export class App implements OnInit {
         this.cdr.detectChanges();
         return;
       }
-
-      // Pour les autres skills, on reste sur le mock Tauri qui renvoie un patch.
-      const run = await invoke<SkillRunModel>('run_skill_mock', {
-        skillName: this.selectedSkillName,
-        path: this.currentDocument.path,
-        mode: 'analysis',
-      });
-      if (!run || !run.patches?.length) return;
-      this.pendingPatches = [...this.pendingPatches, ...run.patches];
-      this.cdr.detectChanges();
     } catch (error) {
       console.error('Failed to run skill', error);
     }
   }
 
   acceptPatch(patch: PatchModel): void {
-    this.pendingPatches = this.pendingPatches.filter((p) => p.id !== patch.id);
+    const delta =
+      patch.afterText.length - (patch.endOffset - patch.startOffset);
+    this.pendingPatches = this.pendingPatches
+      .filter((p) => p.id !== patch.id)
+      .filter(
+        (p) =>
+          !(p.startOffset < patch.endOffset && p.endOffset > patch.startOffset)
+      )
+      .map((p) => {
+        if (p.endOffset <= patch.startOffset) return p;
+        if (p.startOffset >= patch.endOffset) {
+          return {
+            ...p,
+            startOffset: p.startOffset + delta,
+            endOffset: p.endOffset + delta,
+          };
+        }
+        return p;
+      });
     this.cdr.detectChanges();
   }
 
@@ -422,7 +395,9 @@ export class App implements OnInit {
   onFooterResizeMove(event: MouseEvent): void {
     if (!this.footerResizing) return;
     const deltaY = this.footerResizeStartY - event.clientY;
-    let newHeight = Math.max(80, Math.min(window.innerHeight * 0.6, this.footerResizeStartHeight + deltaY));
+    const ui = this.configService.get().ui;
+    const maxH = window.innerHeight * (ui.skillFooterResizeMaxPercentOfWindow / 100);
+    const newHeight = Math.max(ui.skillFooterMinHeightPx, Math.min(maxH, this.footerResizeStartHeight + deltaY));
     this.skillFooterHeightPx = Math.round(newHeight);
     this.cdr.detectChanges();
   }
@@ -449,16 +424,7 @@ export class App implements OnInit {
     if (!text || !this.currentDocument.path || !this.selectedSkillName) {
       return;
     }
-    if (
-      this.selectedSkillName !== 'qa-reader' &&
-      this.selectedSkillName !== 'qa-originality' &&
-      this.selectedSkillName !== 'qa-prose' &&
-      this.selectedSkillName !== 'qa-characters' &&
-      this.selectedSkillName !== 'qa-consistency' &&
-      this.selectedSkillName !== 'write-ink' &&
-      this.selectedSkillName !== 'cowrite-ink' &&
-      this.selectedSkillName !== 'edit-ai-fr'
-    ) {
+    if (!this.configService.get().skills.supportedForRun.includes(this.selectedSkillName)) {
       return;
     }
     try {

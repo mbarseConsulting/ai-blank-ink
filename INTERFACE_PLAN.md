@@ -1,5 +1,9 @@
 # AI Blank Ink – Interface d’atelier texte
 
+**Référence configuration (id : `writer-app-config`)** — Toutes les valeurs en dur (chaînes, chemins, skills, UI, i18n) sont dans `writer-app/config.json`. Voir `writer-app/CONFIG.md`. Ne pas réintroduire de hardcoding dans le code.
+
+---
+
 ## 1. Objectif
 
 Créer une interface dédiée à l’écriture et à la révision de textes de fiction, qui orchestre les skills existants (AI Write Ink, AI Forge Ink, AI Crafter Toolkit) et présente leurs retours sous forme de propositions diffables/mergeables.
