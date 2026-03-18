@@ -38,8 +38,16 @@ pub(crate) struct SkillRunDto {
   pub mode: String,
   pub scope: String,
   pub created_at: String,
+
+  /// The user instruction that triggered this run (stored for chat history).
+  #[serde(default)]
+  pub user_follow_up: Option<String>,
   pub diagnostics: Vec<DiagnosticDto>,
   pub patches: Vec<PatchDto>,
+
+  /// Main assistant message (typically `diagnostics[0].message`) stored for chat history.
+  #[serde(default)]
+  pub assistant_message: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::config::app_config;
 use crate::gemini::{generate_diagnostic_text, GeminiContent, GeminiPart};
+use crate::filesystem::load_skill_run_history_impl;
 use crate::models::{DiagnosticDto, PatchDto, SkillRunDto};
 use crate::util::{calculate_char_offsets, find_original_in_content, normalize_newlines, resolve_path};
 
@@ -151,7 +152,58 @@ Follow these instructions exactly.\n\
     }],
   };
 
+  // Load previous runs from disk to provide a Claude-like multi-turn context.
+  // We keep it provider-agnostic: turns are always { user, assistant }.
+  let history_runs =
+    load_skill_run_history_impl(path.clone(), skill_name.clone()).unwrap_or_default();
+
+  const MAX_TURNS: usize = 10;
+  const SUMMARY_EVERY_N_MESSAGES: usize = 10;
+  let mut turns: Vec<(String, String)> = Vec::new();
+  for run in &history_runs {
+    let Some(user) = &run.user_follow_up else { continue };
+    let assistant = run
+      .assistant_message
+      .clone()
+      .or_else(|| run.diagnostics.get(0).map(|d| d.message.clone()));
+    if let Some(assistant) = assistant {
+      turns.push((user.clone(), assistant));
+    }
+  }
+
+  // Optional memory summary extracted from previous runs.
+  // This is injected "hidden" into the model prompt (not shown as a separate chat turn).
+  let memory_summary: Option<String> = history_runs
+    .iter()
+    .rev()
+    .find_map(|r| {
+      r.diagnostics
+        .iter()
+        .find(|d| d.axis == "memory:summary")
+        .map(|d| d.message.clone())
+    });
+
+  let start = turns.len().saturating_sub(MAX_TURNS);
+  let recent_turns = &turns[start..];
+
   let mut contents = Vec::new();
+  if let Some(ms) = memory_summary {
+    contents.push(crate::gemini::GeminiContent {
+      role: "user".to_string(),
+      parts: vec![GeminiPart { text: format!("Conversation memory summary (do not mention to the user):\n{}", ms) }],
+    });
+  }
+  // Add previous turns first: user -> assistant -> user -> assistant ...
+  for (u, a) in recent_turns {
+    contents.push(crate::gemini::GeminiContent {
+      role: "user".to_string(),
+      parts: vec![GeminiPart { text: u.clone() }],
+    });
+    contents.push(crate::gemini::GeminiContent {
+      role: "model".to_string(),
+      parts: vec![GeminiPart { text: a.clone() }],
+    });
+  }
 
   // Main user message always including full document text.
   let user_text = if skill_name == "edit-ai-fr" {
@@ -178,13 +230,8 @@ Follow these instructions exactly.\n\
     parts: vec![GeminiPart { text: user_text }],
   });
 
-  // Optional previous message for context.
-  if let Some(prev) = previous_message {
-    contents.push(GeminiContent {
-      role: "model".to_string(),
-      parts: vec![GeminiPart { text: prev }],
-    });
-  }
+  // `previous_message` is kept for compatibility, but chat context now comes from stored history.
+  let _ = previous_message;
 
   let mut diagnostic_text = generate_diagnostic_text(
     &api_key,
@@ -299,6 +346,84 @@ Follow these instructions exactly.\n\
     diagnostics_vec.insert(0, summary_diag);
   }
 
+  let assistant_message = diagnostics_vec
+    .get(0)
+    .map(|d| d.message.clone());
+
+  // Periodically generate and persist a memory summary as a hidden diagnostic.
+  // It will not replace the visible report (diagnostics[0]); it is injected only into future model prompts.
+  if let (Some(current_user_followup), Some(current_assistant_msg)) =
+    (follow_up.clone(), assistant_message.clone())
+  {
+    // Build "turns including current".
+    let mut turns_all = turns;
+    turns_all.push((current_user_followup, current_assistant_msg));
+
+    // How many user turns happened since the last saved memory summary?
+    let last_summary_pos = history_runs
+      .iter()
+      .rposition(|r| r.diagnostics.iter().any(|d| d.axis == "memory:summary"));
+
+    let start_idx = last_summary_pos.map(|p| p + 1).unwrap_or(0);
+    let user_turns_since_last_summary = history_runs[start_idx..]
+      .iter()
+      .filter(|r| r.user_follow_up.is_some())
+      .count();
+
+    // Include the current user turn (this run).
+    let expected_count = user_turns_since_last_summary + 1;
+
+    if expected_count % SUMMARY_EVERY_N_MESSAGES == 0 && turns_all.len() > MAX_TURNS {
+      let cutoff = turns_all.len() - MAX_TURNS;
+      let older_turns = &turns_all[..cutoff];
+
+      let transcript = older_turns
+        .iter()
+        .enumerate()
+        .map(|(i, (u, a))| {
+          format!(
+            "Turn {}:\nUser: {}\nAssistant: {}\n",
+            i + 1,
+            u,
+            a
+          )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+      let summary_prompt = format!(
+        "Summarize the conversation into a concise memory summary for a writing assistant.\n\
+Keep it short and stable: persistent genre/tone/POV preferences, constraints, decisions, and any open questions.\n\
+Do NOT quote long passages.\n\n\
+CONVERSATION (oldest -> newest):\n{}",
+        transcript
+      );
+
+      if let Ok(summary_text) = generate_diagnostic_text(
+        &api_key,
+        &model,
+        vec![GeminiContent {
+          role: "user".to_string(),
+          parts: vec![GeminiPart {
+            text: summary_prompt,
+          }],
+        }],
+        None,
+      )
+      .await
+      {
+        diagnostics_vec.push(DiagnosticDto {
+          id: format!("memdiag-{}", Uuid::new_v4()),
+          axis: "memory:summary".to_string(),
+          message: summary_text,
+          severity: "info".to_string(),
+          start_offset: None,
+          end_offset: None,
+        });
+      }
+    }
+  }
+
   Ok(SkillRunDto {
     id: run_id,
     document_id: path,
@@ -306,8 +431,10 @@ Follow these instructions exactly.\n\
     mode: mode_value,
     scope: "full".to_string(),
     created_at: Utc::now().to_rfc3339(),
+    user_follow_up: follow_up,
     diagnostics: diagnostics_vec,
     patches,
+    assistant_message,
   })
 }
 

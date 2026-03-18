@@ -30,11 +30,14 @@ Créer une interface dédiée à l’écriture et à la révision de textes de f
 - `skillName` (`qa-reader`, `qa-originality`, `edit-ai-fr`, etc.)
 - `mode` (`analysis`, `rewrite`, `inline-fix`, …)
 - `scope` (`full` | `selection`)
-- `inputSnapshot` (contenu de départ)
+- `userFollowUp` (instruction utilisateur envoyée via le champ de chat/footer)
+- `assistantMessage` (message principal renvoyé par le skill, typiquement `diagnostics[0].message`)
 - `result` :
   - `diagnostics[]`
   - `patches[]`
 - `createdAt`
+
+Note: un diagnostic “caché” peut aussi exister (ex. `axis: "memory:summary"`) pour la mémoire de chat historisée. L’UI affiche toujours `diagnostics[0]` comme rapport principal.
 
 ### 2.3. Patch / Proposal
 
@@ -63,6 +66,11 @@ Créer une interface dédiée à l’écriture et à la révision de textes de f
 - **Barre latérale gauche** : navigation projet
   - Liste des textes (`Document`)
   - État global (icônes) : brouillon, en relecture, final
+  - Bouton `Nouveau projet` :
+    - affiche un champ inline pour le nom
+    - crée `stories/<Slug>/<Slug>.md` (dossier + fichier dans `stories/`)
+    - ouvre le document + la fenêtre “Analysis Desk”
+    - démarre automatiquement un run `cowrite-ink` pour guider la création
 
 - **Barre latérale droite** : panneau de skills
   - Boutons par skill :

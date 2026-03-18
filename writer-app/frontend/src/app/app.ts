@@ -102,6 +102,10 @@ export class App implements OnInit {
   saveIndicator = '';
   /** Dernier diagnostic textuel (ex. qa-reader) affiché dans le panneau droit. */
   lastDiagnosticMessage: string | null = null;
+  /** Last assistant message from `run_skill` (used as chat context). */
+  private lastSkillAssistantMessage: string | null = null;
+  /** Last user follow-up text sent (used to give context next turn). */
+  private lastUserFollowUpText: string | null = null;
   /** Question de suivi pour le panneau de diagnostic. */
   diagnosticFollowupText: string = '';
 
@@ -251,6 +255,8 @@ export class App implements OnInit {
       };
       // Clear any suggestions from the previous document.
       this.pendingPatches = [];
+      this.lastSkillAssistantMessage = null;
+      this.lastUserFollowUpText = null;
       // Ouvrir / rafraîchir le bureau d'analyse pour ce document.
       this.openAnalysisDesk();
     } catch (error) {
@@ -262,6 +268,8 @@ export class App implements OnInit {
   selectSkill(name: SkillName): void {
     if (this.selectedSkillName !== name) {
       this.lastDiagnosticMessage = null;
+      this.lastSkillAssistantMessage = null;
+      this.lastUserFollowUpText = null;
       this.diagnosticFollowupText = '';
     }
     this.selectedSkillName = name;
@@ -502,8 +510,8 @@ export class App implements OnInit {
         path: this.currentDocument.path,
         mode: 'analysis',
         followUp: text,
-        // On envoie toujours le texte complet + l’instruction détaillée;
-        // pas besoin de renvoyer le message précédent en contexte pour le premier vrai run.
+        // Chat context is now reconstructed from persisted run history (provider-agnostic),
+        // so we don't need to pass previousMessage from the frontend.
         previousMessage: null,
       });
       console.log('skill run completed, emitting skill-run event', {

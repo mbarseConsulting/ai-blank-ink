@@ -67,6 +67,12 @@ export interface SkillRunModel {
   mode: 'analysis' | 'rewrite' | 'inline-fix';
   scope: 'full' | 'selection';
   createdAt: string;
+
+  /** Stored for chat context. */
+  userFollowUp?: string;
+  /** Stored for chat context. */
+  assistantMessage?: string;
+
   diagnostics: DiagnosticModel[];
   patches: PatchModel[];
 }

@@ -75,7 +75,7 @@ Second window and main window communicate via Tauri events and shared `SkillRun`
   - La fenêtre principale émet un événement (actuellement `skill-run`) avec:
     - `documentPath`
     - `skillName`
-    - `SkillRunModel` (including diagnostics + patches, even if patches are not displayed here).
+    - `SkillRunModel` (including diagnostics + patches, plus persisted chat fields `userFollowUp` and `assistantMessage`).
 - The analysis window listens and:
   - Updates its Run History for this document.
   - Optionally auto-selects the latest run for the current skill.
@@ -137,7 +137,7 @@ These colors are used for tags, badges, run history markers, and section heading
   - Intégration Tauri :
     - Écoute `analysis-init` :
       - Reçoit `{ documentPath }` depuis la fenêtre principale.
-      - Charge l’historique pour tous les skills supportés (`qa-reader`, `qa-originality`, `qa-prose`, `edit-ai-fr`) depuis `.analysis-history/`.
+      - Charge l’historique pour tous les skills supportés par le bureau d’analyse (ex. `qa-reader`, `qa-originality`, `qa-prose`, `qa-characters`, `qa-consistency`, `write-ink`, `cowrite-ink`, `edit-ai-fr`) depuis `.analysis-history/`.
       - Initialise `openSkills` uniquement avec les skills ayant de l’historique.
       - Choisit un skill actif par défaut (ordre : `qa-reader` → `qa-originality` → `qa-prose` → `edit-ai-fr`) et sélectionne le run le plus récent.
     - Écoute `skill-run` :
@@ -162,6 +162,7 @@ These colors are used for tags, badges, run history markers, and section heading
 
 - Report reader (zone centrale) :
   - Affiche `activeRun.diagnostics[0].message` comme corps principal du rapport (rapport “éditorial”).
+  - Les “diagnostics cachés” (ex. `axis: "memory:summary"`) ne doivent pas remplacer `diagnostics[0]` : ils servent uniquement à enrichir le prompt LLM suivant.
   - **Rendu Markdown** : gras `**texte**`, italique `*texte*`, listes à puces (`-` ou `*`), retours à la ligne conservés. Parsing maison (pas de lib externe), échappement XSS (`<`, `>`, `&`). Styles dédiés pour `strong`, `em`, listes, paragraphes.
   - Pour `edit-ai-fr`, ce message inclut également un bloc listant les suggestions détectées sous forme :
     - `ORIGINAL / REPLACEMENT / EXPLANATION` (données issues du JSON structuré renvoyé par Gemini, et réinjectées par le backend).
