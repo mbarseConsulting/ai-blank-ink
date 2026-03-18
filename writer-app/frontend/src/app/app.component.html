@@ -10,6 +10,43 @@
       <span class="save-indicator" *ngIf="saveIndicator">{{ saveIndicator }}</span>
     </div>
 
+    <div class="new-project-row" *ngIf="!isCreatingProject; else newProjectForm">
+      <button
+        class="refresh-button"
+        type="button"
+        (click)="startNewProjectInline()"
+      >
+        Nouveau projet
+      </button>
+    </div>
+
+    <ng-template #newProjectForm>
+      <div class="new-project-row">
+        <input
+          id="new-project-title-input"
+          class="new-project-input"
+          type="text"
+          [(ngModel)]="newProjectTitle"
+          placeholder="Nom du projet / histoire…"
+          (keyup.enter)="confirmNewProjectInline()"
+        />
+        <button
+          class="refresh-button"
+          type="button"
+          (click)="confirmNewProjectInline()"
+        >
+          Créer
+        </button>
+        <button
+          class="refresh-button"
+          type="button"
+          (click)="cancelNewProjectInline()"
+        >
+          Annuler
+        </button>
+      </div>
+    </ng-template>
+
     <button
       class="refresh-button"
       type="button"

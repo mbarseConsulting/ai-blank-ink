@@ -153,6 +153,61 @@ export class App implements OnInit {
     return this.configService.get().i18n.emptyTreeMessage;
   }
 
+  newProjectTitle: string = '';
+  isCreatingProject = false;
+
+  startNewProjectInline(): void {
+    this.isCreatingProject = true;
+    this.newProjectTitle = '';
+    this.cdr.detectChanges();
+    // Let Angular render, then focus the input
+    setTimeout(() => {
+      const el = document.querySelector<HTMLInputElement>('#new-project-title-input');
+      el?.focus();
+    }, 0);
+  }
+
+  cancelNewProjectInline(): void {
+    this.isCreatingProject = false;
+    this.newProjectTitle = '';
+    this.cdr.detectChanges();
+  }
+
+  async confirmNewProjectInline(): Promise<void> {
+    const title = this.newProjectTitle.trim();
+    if (!title) {
+      return;
+    }
+
+    try {
+      const path = await invoke<string>('create_new_story', { title });
+      await this.loadStoriesTree();
+
+      const content = await invoke<string>('open_document', { path });
+      const id = `doc-${path.replace('/', '-').replace('.md', '')}`;
+      const label = path.split('/').pop() ?? title;
+
+      this.currentDocument = {
+        id,
+        title,
+        status: 'draft',
+        path,
+        content,
+        history: [],
+      };
+      this.pendingPatches = [];
+      this.openAnalysisDesk();
+
+      this.selectSkill('cowrite-ink');
+      await this.runSelectedSkill();
+      this.isCreatingProject = false;
+      this.newProjectTitle = '';
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Failed to create new story', error);
+    }
+  }
+
   get editorMinHeightPx(): number {
     return this.configService.get().ui.editorMinHeightPx;
   }
@@ -217,6 +272,20 @@ export class App implements OnInit {
     if (!this.selectedSkillName || !this.currentDocument.path) return;
 
     try {
+      if (this.selectedSkillName === 'calibrate-ink') {
+        this.lastDiagnosticMessage =
+          "Calibrate ink (/calibrate-ink) helps you define the project before writing.\n\n" +
+          "- Genre and subgenre\n" +
+          "- Target reader and tone\n" +
+          "- Point of view and narrative distance\n" +
+          "- Approximate length and structural constraints\n\n" +
+          "In the field below, describe what you want to write (or paste a short pitch),\n" +
+          "and ask it to calibrate genre, tone, POV, length, and key constraints.";
+        this.diagnosticFollowupText = '';
+        this.cdr.detectChanges();
+        return;
+      }
+
       if (this.selectedSkillName === 'qa-reader') {
         // Premier clic : expliquer ce que fait le skill et comment formuler la demande,
         // sans appeler immédiatement l'API.

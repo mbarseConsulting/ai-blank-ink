@@ -38,6 +38,22 @@
   margin-bottom: 8px;
 }
 
+.new-project-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.new-project-input {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  background: #020617;
+  color: #e5e7eb;
+}
+
 .refresh-button {
   margin-bottom: 8px;
   padding: 4px 8px;

@@ -16,6 +16,7 @@
   },
   "skills": {
     "supportedForRun": [
+      "calibrate-ink",
       "qa-reader",
       "qa-originality",
       "qa-prose",
