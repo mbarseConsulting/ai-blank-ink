@@ -1,1 +1,1 @@
-../../../ai-write-ink/skills/puppet-ink/agents/agent-puppet-ink.md
+../../../ai-forge-ink/skills/puppet-cast/agents/agent-puppet-ink.md

@@ -1,0 +1,1 @@
+../../../ai-write-ink/skills/forge-ink/agents/agent-straight-forge.md

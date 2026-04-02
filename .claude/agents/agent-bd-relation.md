@@ -1,0 +1,1 @@
+../../../ai-forge-ink/skills/bd-relation/agents/agent-bd-relation.md
